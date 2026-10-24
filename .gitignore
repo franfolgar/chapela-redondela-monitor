@@ -1,0 +1,6 @@
+.env
+__pycache__/
+*.pyc
+*.log
+estado_articulos.tmp
+.venv/
