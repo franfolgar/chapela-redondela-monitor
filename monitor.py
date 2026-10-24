@@ -9,8 +9,11 @@ Vigila periódicamente las webs:
   - https://metropolitano.gal/agenda/
   - https://metropolitano.gal/seccion/que-hacer/
 
-Filtro estricto: En Metropolitano solo se procesan las secciones 'Agenda' y 'Qué Hacer',
-excluyendo de forma taxativa noticias de 'Enfoque', política, sucesos o actualidad general.
+Gestión de usuarios y suscriptores:
+  - Detecta a cualquier nuevo usuario que pulse /start en Telegram.
+  - Le da la bienvenida de forma personalizada y le envía la cartelera completa
+    de todos los eventos futuros publicados para que no se pierda nada.
+  - Transmite los nuevos eventos automáticamente a todos los usuarios suscritos.
 """
 
 import os
@@ -19,6 +22,7 @@ import json
 import logging
 import re
 import html
+import time
 from pathlib import Path
 from datetime import datetime, date
 from typing import Dict, List, Set, Any, Optional, Tuple
@@ -44,6 +48,7 @@ raw_keywords = os.getenv("KEYWORDS", "Chapela,Redondela")
 KEYWORDS = [k.strip() for k in raw_keywords.split(",") if k.strip()]
 
 DATA_FILE = BASE_DIR / "estado_articulos.json"
+SUBSCRIBERS_FILE = BASE_DIR / "suscriptores.json"
 LOG_FILE = BASE_DIR / "monitor.log"
 
 MONTH_MAP = {
@@ -106,21 +111,18 @@ def clean_url(url: str) -> str:
 
 def is_allowed_section(url: str) -> bool:
     """
-    Filtro estricto solicitado:
-    - En Metropolitano: EXCLUSIVAMENTE '/agenda/' y '/que-hacer/'.
-      Quedan terminantemente excluidas '/enfoque/', '/extra/', noticias políticas o de sucesos.
-    - En VigoPeques: todo el dominio vigopeques.com es apto.
+    Filtro estricto:
+    - Metropolitano: EXCLUSIVAMENTE '/agenda/' y '/que-hacer/'.
+      Quedan taxativamente excluidas '/enfoque/', '/extra/', política o sucesos.
+    - VigoPeques: todo el dominio vigopeques.com es apto (ocio y familia).
     """
     if not url:
         return False
 
     if "metropolitano.gal" in url:
-        # Exclusión taxativa de secciones no deseadas
         for forbidden in ["/enfoque/", "/extra/", "/actualidad/", "/opinion/", "/economia/"]:
             if forbidden in url:
                 return False
-
-        # Solo admitir agenda y que-hacer
         if not ("/agenda/" in url or "/que-hacer/" in url):
             return False
 
@@ -184,8 +186,7 @@ def clean_date_display(raw_date: str) -> str:
     txt = raw_date.strip()
     txt = re.sub(r"^(?:el|del)\s+", "", txt, flags=re.I)
     txt = re.sub(r"\(GMT[^)]*\)", "", txt)
-    txt = re.sub(r"\s*-\s*.*$", "", txt)  # Conservar hora inicial si es un rango
-    # Insertar 'de' si falta (ej: '24 octubre' -> '24 de octubre')
+    txt = re.sub(r"\s*-\s*.*$", "", txt)
     txt = re.sub(
         r"(\d{1,2})\s+([a-zA-Záéíóú]+)",
         lambda m: f"{m.group(1)} de {m.group(2)}" if m.group(2).lower() in MONTH_MAP else m.group(0),
@@ -195,14 +196,10 @@ def clean_date_display(raw_date: str) -> str:
 
 
 def extract_event_date(session: requests.Session, url: str, title: str, content: str, pub_date: str) -> Tuple[str, Optional[date]]:
-    """
-    Determina la fecha del evento extrayéndola de los metadatos de EventON
-    o analizando las menciones de fecha en el texto.
-    """
+    """Determina la fecha del evento a partir de metadatos o menciones en el texto."""
     event_date_str = ""
     dt_key = None
 
-    # 1. Si es enlace de la agenda de Metropolitano, consultar la ficha de EventON
     if "/agenda/" in url:
         try:
             resp = session.get(url, timeout=8)
@@ -217,7 +214,6 @@ def extract_event_date(session: requests.Session, url: str, title: str, content:
         except Exception as e:
             logger.debug(f"No se pudo extraer caja EventON de {url}: {e}")
 
-    # 2. Si no hay fecha de EventON, buscar fechas en el título y contenido
     blob = f"{title}. {content}"
     if not event_date_str:
         all_matches = re.findall(
@@ -252,7 +248,6 @@ def extract_event_date(session: requests.Session, url: str, title: str, content:
         if not event_date_str and all_matches:
             event_date_str = all_matches[0]
 
-    # Calcular dt_key si aún no se tiene
     if event_date_str and dt_key is None:
         m_month = re.search(
             r"(\d{1,2})\s*(?:de\s+)?(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)",
@@ -273,7 +268,6 @@ def extract_event_date(session: requests.Session, url: str, title: str, content:
                 except ValueError:
                     pass
 
-    # Fallback: fecha de publicación
     if not event_date_str:
         if pub_date:
             try:
@@ -289,11 +283,11 @@ def extract_event_date(session: requests.Session, url: str, title: str, content:
 
 
 # ==============================================================================
-# EXTRACTORES DE CONTENIDO (EXCLUSIVAMENTE AGENDA Y QUÉ HACER)
+# EXTRACTORES DE CONTENIDO
 # ==============================================================================
 
 def fetch_metropolitano_agenda(session: requests.Session) -> List[Dict[str, Any]]:
-    """Extrae exclusivamente los eventos de la agenda oficial de Metropolitano.gal."""
+    """Extrae exclusivamente los eventos de la agenda de Metropolitano.gal."""
     items = []
     url = "https://metropolitano.gal/wp-json/wp/v2/ajde_events?per_page=50"
     try:
@@ -323,7 +317,7 @@ def fetch_metropolitano_agenda(session: requests.Session) -> List[Dict[str, Any]
 
 
 def fetch_metropolitano_que_hacer(session: requests.Session) -> List[Dict[str, Any]]:
-    """Extrae artículos de la sección 'Qué hacer' de Metropolitano.gal (Categoría 169)."""
+    """Extrae artículos de la sección 'Qué hacer' de Metropolitano.gal."""
     items = []
     url = "https://metropolitano.gal/wp-json/wp/v2/posts?categories=169&per_page=50"
     try:
@@ -424,41 +418,12 @@ def fetch_vigopeques_tag_redondela(session: requests.Session) -> List[Dict[str, 
                     "url": clean_link,
                     "title": strip_html(title),
                     "content": full_desc,
-                    "source": "VigoPeques (Redondela)",
+                    "source": "VigoPeques",
                     "date": pub_date,
                 })
             logger.info(f"VigoPeques Tag Redondela: {len(items)} artículos obtenidos.")
     except Exception as e:
         logger.warning(f"Error consultando tag Redondela de VigoPeques: {e}")
-    return items
-
-
-def fetch_vigopeques_searches(session: requests.Session, keywords: List[str]) -> List[Dict[str, Any]]:
-    """Scrapea los resultados del buscador de VigoPeques para Chapela y Redondela."""
-    items = []
-    for kw in keywords:
-        url = f"https://www.vigopeques.com/?s={kw}"
-        try:
-            resp = session.get(url, timeout=15)
-            if resp.status_code == 200:
-                soup = BeautifulSoup(resp.content, "html.parser")
-                for art in soup.find_all("article"):
-                    a_el = art.find("a", href=True)
-                    if not a_el:
-                        continue
-                    link = clean_url(a_el["href"])
-                    heading = art.find(["h1", "h2", "h3", "h4"])
-                    title = heading.get_text(strip=True) if heading else (a_el.get("title") or "")
-                    items.append({
-                        "id": link,
-                        "url": link,
-                        "title": strip_html(title),
-                        "content": strip_html(art.get_text(" ", strip=True)),
-                        "source": "VigoPeques",
-                        "date": "",
-                    })
-        except Exception as e:
-            logger.warning(f"Error en búsqueda VigoPeques ({kw}): {e}")
     return items
 
 
@@ -506,19 +471,45 @@ def fetch_vigopeques_home(session: requests.Session) -> List[Dict[str, Any]]:
     return items
 
 
+def fetch_vigopeques_searches(session: requests.Session, keywords: List[str]) -> List[Dict[str, Any]]:
+    """Scrapea los resultados del buscador de VigoPeques para Chapela y Redondela."""
+    items = []
+    for kw in keywords:
+        url = f"https://www.vigopeques.com/?s={kw}"
+        try:
+            resp = session.get(url, timeout=15)
+            if resp.status_code == 200:
+                soup = BeautifulSoup(resp.content, "html.parser")
+                for art in soup.find_all("article"):
+                    a_el = art.find("a", href=True)
+                    if not a_el:
+                        continue
+                    link = clean_url(a_el["href"])
+                    heading = art.find(["h1", "h2", "h3", "h4"])
+                    title = heading.get_text(strip=True) if heading else (a_el.get("title") or "")
+                    items.append({
+                        "id": link,
+                        "url": link,
+                        "title": strip_html(title),
+                        "content": strip_html(art.get_text(" ", strip=True)),
+                        "source": "VigoPeques",
+                        "date": "",
+                    })
+        except Exception as e:
+            logger.warning(f"Error en búsqueda VigoPeques ({kw}): {e}")
+    return items
+
+
 # ==============================================================================
 # PROCESAMIENTO Y DEDUPLICACIÓN
 # ==============================================================================
 
 def get_all_matched_articles() -> List[Dict[str, Any]]:
-    """
-    Obtiene artículos exclusivamente de Agenda, Qué Hacer y VigoPeques,
-    filtrando rigurosamente contra 'Enfoque' o noticias no relacionadas.
-    """
+    """Obtiene artículos filtrados exclusivamente de Agenda, Qué Hacer y VigoPeques."""
     session = create_session()
 
     raw_items = []
-    # 1. Metropolitano: Exclusivamente Agenda y Qué Hacer
+    # 1. Metropolitano: Agenda y Qué Hacer
     raw_items.extend(fetch_metropolitano_agenda(session))
     raw_items.extend(fetch_metropolitano_que_hacer(session))
 
@@ -553,7 +544,6 @@ def get_all_matched_articles() -> List[Dict[str, Any]]:
             article["matched_keywords"] = matches
             article["snippet"] = extract_snippet(article.get("content", ""), matches)
 
-            # Extraer fecha del evento
             event_date, dt_key = extract_event_date(
                 session=session,
                 url=article.get("url", ""),
@@ -569,9 +559,73 @@ def get_all_matched_articles() -> List[Dict[str, Any]]:
     return matched_articles
 
 
+def get_sorted_future_events(articles: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Filtra y ordena cronológicamente los eventos futuros desde la fecha actual."""
+    today = date.today()
+    future_events = []
+    seen_urls = set()
+
+    for art in articles:
+        if not is_allowed_section(art.get("url", "")):
+            continue
+
+        date_key_str = art.get("event_date_key")
+        if date_key_str:
+            try:
+                dt_key = date.fromisoformat(date_key_str)
+                if dt_key >= today and art["url"] not in seen_urls:
+                    seen_urls.add(art["url"])
+                    future_events.append({
+                        "dt_key": dt_key,
+                        "event_date": art.get("event_date", ""),
+                        "title": art.get("title", ""),
+                        "url": art.get("url", ""),
+                        "source": art.get("source", ""),
+                    })
+            except Exception:
+                pass
+
+    future_events.sort(key=lambda x: x["dt_key"])
+    return future_events
+
+
 # ==============================================================================
-# PERSISTENCIA DE ESTADO
+# GESTIÓN DE SUSCRIPTORES Y PERSISTENCIA
 # ==============================================================================
+
+def load_subscribers() -> Dict[str, Any]:
+    """Carga el listado de suscriptores registrados."""
+    if not SUBSCRIBERS_FILE.exists():
+        if TELEGRAM_CHAT_ID:
+            return {
+                TELEGRAM_CHAT_ID: {
+                    "first_name": "Admin",
+                    "subscribed_at": datetime.now().isoformat()
+                }
+            }
+        return {}
+    try:
+        with open(SUBSCRIBERS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if TELEGRAM_CHAT_ID and TELEGRAM_CHAT_ID not in data:
+                data[TELEGRAM_CHAT_ID] = {
+                    "first_name": "Admin",
+                    "subscribed_at": datetime.now().isoformat()
+                }
+            return data
+    except Exception as e:
+        logger.error(f"Error al leer {SUBSCRIBERS_FILE}: {e}")
+        return {}
+
+
+def save_subscribers(subscribers: Dict[str, Any]) -> None:
+    """Guarda atómicamente el listado de suscriptores."""
+    temp_file = SUBSCRIBERS_FILE.with_suffix(".tmp")
+    with open(temp_file, "w", encoding="utf-8") as f:
+        json.dump(subscribers, f, ensure_ascii=False, indent=2)
+    temp_file.replace(SUBSCRIBERS_FILE)
+    logger.info(f"Listado de suscriptores actualizado con {len(subscribers)} usuarios.")
+
 
 def load_previous_state(filepath: Path) -> Dict[str, Any]:
     """Carga el estado de artículos previamente registrados."""
@@ -595,18 +649,17 @@ def save_current_state(filepath: Path, state: Dict[str, Any]) -> None:
 
 
 # ==============================================================================
-# SISTEMA DE NOTIFICACIONES TELEGRAM
+# MENSAJES Y NOTIFICACIONES TELEGRAM
 # ==============================================================================
 
-def send_telegram_message(message: str) -> bool:
-    """Envía un mensaje con formato HTML al bot de Telegram."""
-    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
-        logger.error("Credenciales de Telegram no configuradas en el archivo .env.")
+def send_telegram_message(chat_id: str, message: str) -> bool:
+    """Envía un mensaje con formato HTML a un chat concreto de Telegram."""
+    if not TELEGRAM_TOKEN or not chat_id:
         return False
 
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     payload = {
-        "chat_id": TELEGRAM_CHAT_ID,
+        "chat_id": chat_id,
         "text": message,
         "parse_mode": "HTML",
         "disable_web_page_preview": False,
@@ -615,18 +668,60 @@ def send_telegram_message(message: str) -> bool:
     try:
         resp = requests.post(url, json=payload, timeout=20)
         resp.raise_for_status()
-        logger.info("Notificación enviada a Telegram con éxito.")
+        logger.info(f"Mensaje enviado con éxito a chat {chat_id}.")
         return True
     except Exception as e:
-        logger.error(f"Error al enviar mensaje a Telegram: {e}")
+        logger.error(f"Error al enviar mensaje a Telegram (chat {chat_id}): {e}")
         return False
 
 
+def broadcast_telegram_message(message: str) -> None:
+    """Difunde un mensaje a todos los suscriptores registrados."""
+    subscribers = load_subscribers()
+    if not subscribers and TELEGRAM_CHAT_ID:
+        send_telegram_message(TELEGRAM_CHAT_ID, message)
+        return
+
+    for cid in subscribers.keys():
+        send_telegram_message(cid, message)
+
+
+def build_future_events_text(future_events: List[Dict[str, Any]]) -> str:
+    """Construye las líneas de texto formateadas de eventos futuros."""
+    if not future_events:
+        return "<i>No hay eventos programados en este momento.</i>"
+
+    lineas = []
+    for ev in future_events:
+        d = escape_telegram_html(ev["event_date"])
+        t = escape_telegram_html(ev["title"])
+        u = ev["url"]
+        lineas.append(f"• [<b>{d}</b>] <a href=\"{u}\">{t}</a>")
+
+    return "\n\n".join(lineas)
+
+
+def build_welcome_message(first_name: str, future_events: List[Dict[str, Any]]) -> str:
+    """
+    Construye el mensaje de bienvenida completo para nuevos usuarios,
+    incluyendo la cartelera de eventos futuros para que no se pierdan nada.
+    """
+    nombre_limpio = escape_telegram_html(first_name or "vecino/a")
+    cartelera = build_future_events_text(future_events)
+
+    message = (
+        f"👋 ¡Hola, <b>{nombre_limpio}</b>! Bienvenido/a al <b>Bot de Eventos de Chapela y Redondela</b> 📍\n\n"
+        f"A continuación tienes la <b>cartelera completa de todos los eventos futuros</b> ya publicados en la comarca para que no te pierdas ninguno:\n\n"
+        f"{cartelera}\n\n"
+        f"🔔 <b>¿Cómo funciona?</b>\n"
+        f"Cada vez que se publique una nueva fiesta, magosto, festival o plan cultural en <b>VigoPeques</b> o la <b>Agenda de Metropolitano</b>, recibirás un aviso automático al momento por aquí.\n\n"
+        f"<i>¡Disfruta de los planes de nuestra tierra!</i>"
+    )
+    return message
+
+
 def format_article_message(article: Dict[str, Any]) -> str:
-    """
-    Genera el mensaje para un nuevo evento detectado.
-    Muestra la fecha del evento y el título enlazado.
-    """
+    """Genera el mensaje para un nuevo evento detectado."""
     event_date = escape_telegram_html(article.get("event_date", "Fecha por confirmar"))
     title = escape_telegram_html(article.get("title", "Sin título"))
     source = escape_telegram_html(article.get("source", "Web"))
@@ -646,59 +741,91 @@ def format_article_message(article: Dict[str, Any]) -> str:
     return message
 
 
-def send_future_events_summary(articles: List[Dict[str, Any]]) -> bool:
+# ==============================================================================
+# GESTIÓN DE ACTUALIZACIONES TELEGRAM (NUEVOS USUARIOS /START)
+# ==============================================================================
+
+def process_telegram_updates(future_events: List[Dict[str, Any]]) -> None:
     """
-    Filtra los eventos con fecha futura (de hoy en adelante),
-    exclusivamente de Agenda, Qué Hacer y VigoPeques,
-    los ordena cronológicamente y envía la cartelera por Telegram.
+    Consulta getUpdates en Telegram:
+    - Identifica a nuevos usuarios que hayan iniciado el bot (/start).
+    - Les envía el mensaje de bienvenida con el resumen completo de eventos futuros.
+    - Actualiza y guarda el registro en suscriptores.json.
+    - Confirma los mensajes procesados con offset para no duplicar.
     """
-    today = date.today()
-    future_events = []
-    seen_urls = set()
+    if not TELEGRAM_TOKEN:
+        return
 
-    for art in articles:
-        if not is_allowed_section(art.get("url", "")):
-            continue
+    subscribers = load_subscribers()
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getUpdates"
 
-        date_key_str = art.get("event_date_key")
-        if date_key_str:
-            try:
-                dt_key = date.fromisoformat(date_key_str)
-                if dt_key >= today and art["url"] not in seen_urls:
-                    seen_urls.add(art["url"])
-                    future_events.append({
-                        "dt_key": dt_key,
-                        "event_date": art.get("event_date", ""),
-                        "title": art.get("title", ""),
-                        "url": art.get("url", ""),
-                        "source": art.get("source", "")
-                    })
-            except Exception:
-                pass
+    try:
+        resp = requests.get(url, timeout=10)
+        data = resp.json()
+        if not data.get("ok"):
+            return
 
-    # Ordenar cronológicamente
-    future_events.sort(key=lambda x: x["dt_key"])
+        updates = data.get("result", [])
+        if not updates:
+            return
 
-    if not future_events:
-        logger.info("No se encontraron eventos futuros en las publicaciones actuales.")
-        return False
+        max_update_id = None
+        new_users_added = False
 
-    lineas = []
-    for ev in future_events:
-        d = escape_telegram_html(ev["event_date"])
-        t = escape_telegram_html(ev["title"])
-        u = ev["url"]
-        lineas.append(f"• [<b>{d}</b>] <a href=\"{u}\">{t}</a>")
+        for up in updates:
+            up_id = up.get("update_id")
+            if up_id is not None:
+                max_update_id = up_id if max_update_id is None else max(max_update_id, up_id)
 
-    items_text = "\n\n".join(lineas)
+            msg = up.get("message") or up.get("my_chat_member")
+            if not msg:
+                continue
 
-    message = (
-        f"📅 <b>AGENDA & QUÉ HACER - EVENTOS FUTUROS</b>\n\n"
-        f"Convocatorias y planes publicados para Chapela y Redondela:\n\n"
-        f"{items_text}\n\n"
-        f"🔔 <i>Recibirás un aviso inmediato con cada nuevo evento que se publique.</i>"
-    )
-    return send_telegram_message(message)
+            chat = msg.get("chat", {})
+            cid = str(chat.get("id", ""))
+            from_user = msg.get("from", {})
+            first_name = from_user.get("first_name", "")
+            username = from_user.get("username", "")
+            text = (msg.get("text") or "").strip().lower()
+
+            if not cid:
+                continue
+
+            # Si es nuevo usuario o solicita /start o /eventos
+            is_new_user = cid not in subscribers
+            is_start_cmd = text.startswith("/start") or text.startswith("/eventos") or text.startswith("/agenda")
+
+            if is_new_user:
+                logger.info(f"Nuevo suscriptor detectado: {first_name} (@{username}) [ID: {cid}]")
+                subscribers[cid] = {
+                    "first_name": first_name,
+                    "username": username,
+                    "subscribed_at": datetime.now().isoformat(),
+                    "last_interaction": datetime.now().isoformat(),
+                }
+                new_users_added = True
+
+                # Enviar bienvenida personalizada con cartelera de eventos futuros
+                welcome_msg = build_welcome_message(first_name, future_events)
+                send_telegram_message(cid, welcome_msg)
+
+            elif is_start_cmd:
+                # Usuario existente solicitando cartelera
+                logger.info(f"Comando '{text}' de suscriptor existente: {first_name} [ID: {cid}]")
+                subscribers[cid]["last_interaction"] = datetime.now().isoformat()
+                new_users_added = True
+                welcome_msg = build_welcome_message(first_name, future_events)
+                send_telegram_message(cid, welcome_msg)
+
+        if new_users_added:
+            save_subscribers(subscribers)
+
+        # Confirmar updates procesados con offset
+        if max_update_id is not None:
+            requests.get(f"{url}?offset={max_update_id + 1}&limit=1", timeout=10)
+
+    except Exception as e:
+        logger.error(f"Error procesando actualizaciones de Telegram: {e}")
 
 
 # ==============================================================================
@@ -711,9 +838,13 @@ def run(force_future_summary: bool = False):
     logger.info("=================================================================")
 
     current_matches = get_all_matched_articles()
+    future_events = get_sorted_future_events(current_matches)
+
+    # 1. Procesar a cualquier nuevo usuario que haya pulsado /start
+    process_telegram_updates(future_events)
+
     previous_state = load_previous_state(DATA_FILE)
 
-    # Limpiar cualquier artículo previo que perteneciese a 'Enfoque' o secciones prohibidas
     cleaned_saved_articles = {}
     for url, art in previous_state.get("articulos", {}).items():
         if is_allowed_section(url):
@@ -741,13 +872,28 @@ def run(force_future_summary: bool = False):
             }
 
         save_current_state(DATA_FILE, new_state)
-        send_future_events_summary(current_matches)
-        logger.info("Monitor inicializado con éxito y resumen de eventos futuros enviado.")
+        # Difundir cartelera inicial a los suscriptores
+        cartelera = build_future_events_text(future_events)
+        msg = (
+            "📅 <b>AGENDA & QUÉ HACER - EVENTOS FUTUROS</b>\n\n"
+            "Convocatorias y planes publicados para Chapela y Redondela:\n\n"
+            f"{cartelera}\n\n"
+            "🔔 <i>Recibirás un aviso inmediato con cada nuevo evento que se publique.</i>"
+        )
+        broadcast_telegram_message(msg)
+        logger.info("Monitor inicializado con éxito.")
         return
 
     if force_future_summary:
-        logger.info("Enviando resumen de eventos futuros a petición...")
-        send_future_events_summary(current_matches)
+        logger.info("Difundiendo cartelera de eventos futuros a petición...")
+        cartelera = build_future_events_text(future_events)
+        msg = (
+            "📅 <b>AGENDA & QUÉ HACER - EVENTOS FUTUROS</b>\n\n"
+            "Convocatorias y planes publicados para Chapela y Redondela:\n\n"
+            f"{cartelera}\n\n"
+            "🔔 <i>Recibirás un aviso inmediato con cada nuevo evento que se publique.</i>"
+        )
+        broadcast_telegram_message(msg)
 
     # Comprobación de artículos nuevos
     new_articles = []
@@ -762,24 +908,22 @@ def run(force_future_summary: bool = False):
         for art in new_articles:
             logger.info(f"Notificando nuevo evento: {art['title']} [{art.get('event_date')}] ({art['url']})")
             msg = format_article_message(art)
-            sent = send_telegram_message(msg)
-            if sent:
-                cleaned_saved_articles[art["url"]] = {
-                    "title": art["title"],
-                    "source": art["source"],
-                    "event_date": art.get("event_date", ""),
-                    "event_date_key": art.get("event_date_key"),
-                    "first_seen": now_iso,
-                    "notified_at": now_iso,
-                }
+            broadcast_telegram_message(msg)
+            cleaned_saved_articles[art["url"]] = {
+                "title": art["title"],
+                "source": art["source"],
+                "event_date": art.get("event_date", ""),
+                "event_date_key": art.get("event_date_key"),
+                "first_seen": now_iso,
+                "notified_at": now_iso,
+            }
 
         previous_state["last_check"] = now_iso
         previous_state["total_registrados"] = len(cleaned_saved_articles)
         previous_state["articulos"] = cleaned_saved_articles
         save_current_state(DATA_FILE, previous_state)
-        logger.info(f"Se han notificado {len(new_articles)} eventos nuevos.")
+        logger.info(f"Se han notificado {len(new_articles)} eventos nuevos a todos los suscriptores.")
     else:
-        # Asegurar actualización de metadatos de fechas
         for art in current_matches:
             url = art["url"]
             if url in cleaned_saved_articles:
@@ -793,6 +937,41 @@ def run(force_future_summary: bool = False):
         logger.info("No hay nuevos eventos publicados. Todo al día.")
 
 
+# ==============================================================================
+# MODO ESCUCHA EN TIEMPO REAL (DAEMON / POLLING)
+# ==============================================================================
+
+def run_listener_loop():
+    """
+    Bucle de escucha interactivo en tiempo real.
+    Permite responder a /start y comandos en menos de 1 segundo de forma continua.
+    """
+    logger.info("Iniciando bucle de escucha en tiempo real de Telegram...")
+    current_matches = get_all_matched_articles()
+    future_events = get_sorted_future_events(current_matches)
+    last_refresh = time.time()
+
+    while True:
+        try:
+            # Cada 30 minutos refrescar eventos
+            if time.time() - last_refresh > 1800:
+                current_matches = get_all_matched_articles()
+                future_events = get_sorted_future_events(current_matches)
+                last_refresh = time.time()
+
+            process_telegram_updates(future_events)
+            time.sleep(2)
+        except KeyboardInterrupt:
+            logger.info("Escucha detenida por el usuario.")
+            break
+        except Exception as e:
+            logger.error(f"Error en bucle de escucha: {e}")
+            time.sleep(5)
+
+
 if __name__ == "__main__":
-    send_summary = "--send-future" in sys.argv
-    run(force_future_summary=send_summary)
+    if "--listen" in sys.argv or "--daemon" in sys.argv:
+        run_listener_loop()
+    else:
+        send_summary = "--send-future" in sys.argv
+        run(force_future_summary=send_summary)
