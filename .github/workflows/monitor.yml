@@ -2,12 +2,10 @@ name: Monitor de Artículos - Chapela y Redondela
 
 on:
   schedule:
-    # Dos ejecuciones al día:
-    # - Mañana (~09:25 hora peninsular española / 07:25 UTC)
-    # - Tarde/Noche (~19:25 hora peninsular española / 17:25 UTC)
-    # Usamos minuto :25 para evitar las colas masivas de GitHub en los minutos en punto (:00).
-    - cron: '25 7 * * *'
-    - cron: '25 17 * * *'
+    # 6 ejecuciones al día (cada 4 horas):
+    # 01:25, 05:25, 09:25, 13:25, 17:25 y 21:25 (aprox. hora peninsular española)
+    # Minuto :25 para evitar colas de GitHub Actions en minutos en punto (:00).
+    - cron: '25 */4 * * *'
   workflow_dispatch:
     # Permite ejecutar manualmente la comprobación desde la pestaña Actions en GitHub
 

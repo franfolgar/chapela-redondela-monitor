@@ -92,7 +92,7 @@ schtasks /create /tn "ChapelaRedondelaMonitor" /tr "C:\Users\fran_\.gemini\antig
 ### Opción 2: En la nube con GitHub Actions (Gratis 24/7 sin encender el PC)
 
 El repositorio incluye el archivo listo en `.github/workflows/monitor.yml`.
-Está configurado para ejecutarse automáticamente **dos veces al día** (por la mañana sobre las 09:25 y por la tarde sobre las 19:25 hora española peninsular):
+Está configurado para ejecutarse automáticamente **6 veces al día** (cada 4 horas: sobre las 09:25, 13:25, 17:25, 21:25, 01:25 y 05:25 hora española peninsular):
 
 1. Sube este repositorio a tu cuenta de GitHub (`franfolgar/chapela-redondela-monitor`).
 2. Los secretos de Telegram (`TELEGRAM_TOKEN` y `TELEGRAM_CHAT_ID`) se configuran automáticamente en **Settings** -> **Secrets and variables** -> **Actions**.
