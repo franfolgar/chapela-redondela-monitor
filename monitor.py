@@ -59,6 +59,9 @@ MONTH_MAP = {
     "jul": 7, "ago": 8, "sep": 9, "set": 9, "oct": 10, "nov": 11, "dic": 12,
 }
 
+DAYS_ES = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+MONTHS_ES = ["", "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -500,12 +503,60 @@ def fetch_vigopeques_searches(session: requests.Session, keywords: List[str]) ->
     return items
 
 
+def fetch_redondela_agenda(session: requests.Session) -> List[Dict[str, Any]]:
+    """Extrae eventos oficiales de la Axenda Completa de redondela.gal (The Events Calendar API)."""
+    items = []
+    url = "https://redondela.gal/wp-json/tribe/events/v1/events?categories=axenda-completa&per_page=50"
+    try:
+        logger.info("Consultando Axenda Completa de Concello de Redondela (redondela.gal)...")
+        resp = session.get(url, timeout=20)
+        resp.raise_for_status()
+        data = resp.json()
+        events = data.get("events", [])
+        for ev in events:
+            link = clean_url(ev.get("url", ""))
+            raw_title = ev.get("title", "")
+            raw_desc = ev.get("description", "")
+            start_date_str = ev.get("start_date", "")
+
+            event_date = ""
+            dt_key = None
+            if start_date_str:
+                try:
+                    dt = datetime.strptime(start_date_str, "%Y-%m-%d %H:%M:%S")
+                    dt_key = dt.date()
+                    day_name = DAYS_ES[dt.weekday()]
+                    month_name = MONTHS_ES[dt.month]
+                    time_part = f" ({dt.hour:02d}:{dt.minute:02d})" if (dt.hour != 0 or dt.minute != 0) else ""
+                    event_date = f"{day_name}, {dt.day} de {month_name}{time_part}"
+                except Exception:
+                    event_date = start_date_str[:10]
+
+            title_clean = strip_html(raw_title)
+            desc_clean = strip_html(raw_desc)
+
+            items.append({
+                "id": str(ev.get("id")),
+                "url": link,
+                "title": title_clean,
+                "content": desc_clean,
+                "source": "Concello de Redondela (Axenda)",
+                "event_date": event_date,
+                "event_date_key": dt_key.isoformat() if dt_key else None,
+                "date": ev.get("date", ""),
+            })
+        logger.info(f"Concello de Redondela: {len(items)} eventos obtenidos de Axenda Completa.")
+    except Exception as e:
+        logger.error(f"Error consultando agenda de redondela.gal: {e}")
+    return items
+
+
 # ==============================================================================
 # PROCESAMIENTO Y DEDUPLICACIÓN
 # ==============================================================================
 
 def get_all_matched_articles() -> List[Dict[str, Any]]:
-    """Obtiene artículos filtrados exclusivamente de Agenda, Qué Hacer y VigoPeques."""
+    """Obtiene artículos filtrados de Agenda, Qué Hacer, VigoPeques y Axenda de Redondela."""
     session = create_session()
 
     raw_items = []
@@ -518,6 +569,9 @@ def get_all_matched_articles() -> List[Dict[str, Any]]:
     raw_items.extend(fetch_vigopeques_tag_redondela(session))
     raw_items.extend(fetch_vigopeques_home(session))
     raw_items.extend(fetch_vigopeques_searches(session, KEYWORDS))
+
+    # 3. Concello de Redondela: Axenda Completa oficial
+    raw_items.extend(fetch_redondela_agenda(session))
 
     # Deduplicar por URL canónica
     deduped_by_url: Dict[str, Dict[str, Any]] = {}
@@ -535,24 +589,34 @@ def get_all_matched_articles() -> List[Dict[str, Any]]:
             existing["content"] = f"{existing.get('content', '')} {item.get('content', '')}".strip()
             if not existing.get("date") and item.get("date"):
                 existing["date"] = item["date"]
+            if not existing.get("event_date") and item.get("event_date"):
+                existing["event_date"] = item["event_date"]
+                existing["event_date_key"] = item["event_date_key"]
 
     matched_articles = []
     for url, article in deduped_by_url.items():
         search_blob = f"{article.get('title', '')} {article.get('content', '')}"
         matches = extract_matched_keywords(search_blob, KEYWORDS)
+
+        # Si proviene de la Axenda oficial de Redondela, pertenece por definición al municipio
+        if not matches and "redondela.gal" in url:
+            matches = ["Redondela"]
+
         if matches:
             article["matched_keywords"] = matches
             article["snippet"] = extract_snippet(article.get("content", ""), matches)
 
-            event_date, dt_key = extract_event_date(
-                session=session,
-                url=article.get("url", ""),
-                title=article.get("title", ""),
-                content=article.get("content", ""),
-                pub_date=article.get("date", "")
-            )
-            article["event_date"] = event_date
-            article["event_date_key"] = dt_key.isoformat() if dt_key else None
+            if not article.get("event_date"):
+                event_date, dt_key = extract_event_date(
+                    session=session,
+                    url=article.get("url", ""),
+                    title=article.get("title", ""),
+                    content=article.get("content", ""),
+                    pub_date=article.get("date", "")
+                )
+                article["event_date"] = event_date
+                article["event_date_key"] = dt_key.isoformat() if dt_key else None
+
             matched_articles.append(article)
 
     logger.info(f"Total eventos/planes filtrados coincidentes con {KEYWORDS}: {len(matched_articles)}")

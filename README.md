@@ -19,6 +19,10 @@ Monitor automatizado en Python diseñado para vigilar diariamente y en tiempo re
    - API de publicaciones de la categoría de ocio y eventos culturales.
    - Extracción de artículos completos y extractos.
 
+4. **Concello de Redondela - Axenda Completa** ([redondela.gal/agenda/categoria/axenda-completa/](https://redondela.gal/agenda/categoria/axenda-completa/)):
+   - Conexión oficial vía The Events Calendar REST API del Concello.
+   - Extracción de convocatorias culturales, contacontos, festivales, clubes de lectura y exposiciones en Redondela y Chapela.
+
 ---
 
 ## 🚀 Características Principales
