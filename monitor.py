@@ -1158,15 +1158,17 @@ def run(force_future_summary: bool = False):
             }
 
         save_current_state(DATA_FILE, new_state)
-        # Difundir cartelera inicial a los suscriptores
-        cartelera = build_future_events_text(future_events)
-        msg = (
-            "📅 <b>AGENDA & QUÉ HACER - EVENTOS FUTUROS</b>\n\n"
-            f"Convocatorias y planes publicados para Chapela y Redondela (próximos {MAX_FUTURE_DAYS} días):\n\n"
-            f"{cartelera}\n\n"
-            "🔔 <i>Recibirás un aviso inmediato con cada nuevo evento que se publique.</i>"
-        )
-        broadcast_telegram_message(msg)
+        # En servidor Render no spamear a todos con la cartelera completa en reinicios de contenedor;
+        # los usuarios ya pueden consultarla en cualquier momento con /eventos
+        if not os.getenv("RENDER") and not os.getenv("PORT"):
+            cartelera = build_future_events_text(future_events)
+            msg = (
+                "📅 <b>AGENDA & QUÉ HACER - EVENTOS FUTUROS</b>\n\n"
+                f"Convocatorias y planes publicados para Chapela y Redondela (próximos {MAX_FUTURE_DAYS} días):\n\n"
+                f"{cartelera}\n\n"
+                "🔔 <i>Recibirás un aviso inmediato con cada nuevo evento que se publique.</i>"
+            )
+            broadcast_telegram_message(msg)
         logger.info("Monitor inicializado con éxito.")
         return
 
@@ -1325,9 +1327,14 @@ def run_web_server(port: int = 10000):
     else:
         logger.info("RENDER_EXTERNAL_URL no configurado aún (normal en arranque local o primer despliegue).")
 
-    # Hilo secundario: Scraper automático cada 30 minutos
+    # Hilo secundario: Scraper automático (ejecuta un pase inicial de inmediato y luego cada 30 min)
     def periodic_scraper():
-        logger.info("Hilo secundario de scraping activado (revisión periódica cada 30 min).")
+        logger.info("Hilo secundario de scraping activado. Ejecutando escaneo inicial de eventos...")
+        try:
+            run(force_future_summary=False)
+        except Exception as e:
+            logger.error(f"Error en escaneo inicial de arranque: {e}")
+
         while True:
             try:
                 time.sleep(1800)
