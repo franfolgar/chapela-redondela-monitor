@@ -93,7 +93,23 @@ schtasks /create /tn "ChapelaRedondelaMonitor" /tr "C:\Users\fran_\.gemini\antig
 
 ---
 
-### Opción 2: En la nube con GitHub Actions (Gratis 24/7 sin encender el PC)
+### Opción 2: En la nube 24/7 con Render (Web Service + Webhook Instantáneo)
+
+El repositorio incluye el archivo [`render.yaml`](file:///C:/Users/fran_/.gemini/antigravity/scratch/chapela-redondela-monitor/render.yaml) para desplegar el bot en **Render**:
+- **Respuestas instantáneas**: Configura el webhook de Telegram automáticamente para responder a `/eventos`, `/start` y `/ayuda` en menos de 1 segundo.
+- **Scraping continuo**: Incluye un hilo en segundo plano que revisa novedades cada 30 minutos y avisa a los suscriptores.
+- **Healthcheck**: Endpoint `/` con estado y contadores en tiempo real.
+
+Para desplegarlo en Render:
+1. En tu panel de Render, pulsa **New** > **Blueprint** (o **Web Service**) y conecta el repositorio `franfolgar/chapela-redondela-monitor`.
+2. Añade las variables de entorno:
+   - `TELEGRAM_TOKEN`: Tu token de bot de Telegram.
+   - `TELEGRAM_CHAT_ID`: Tu ID de chat administrador.
+3. ¡Listo! Render desplegará el servicio y configurará el Webhook automáticamente.
+
+---
+
+### Opción 3: En la nube con GitHub Actions (Programado cada 4 horas)
 
 El repositorio incluye el archivo listo en `.github/workflows/monitor.yml`.
 Está configurado para ejecutarse automáticamente **6 veces al día** (cada 4 horas: sobre las 09:25, 13:25, 17:25, 21:25, 01:25 y 05:25 hora española peninsular):
