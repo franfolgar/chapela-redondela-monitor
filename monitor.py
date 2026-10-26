@@ -556,7 +556,7 @@ def fetch_redondela_agenda(session: requests.Session) -> List[Dict[str, Any]]:
 # PROCESAMIENTO Y DEDUPLICACIÓN
 # ==============================================================================
 
-def get_all_matched_articles() -> List[Dict[str, Any]]:
+def get_all_matched_articles(known_articles: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
     """Obtiene artículos filtrados de Agenda, Qué Hacer, VigoPeques y Axenda de Redondela."""
     session = create_session()
 
@@ -608,15 +608,20 @@ def get_all_matched_articles() -> List[Dict[str, Any]]:
             article["snippet"] = extract_snippet(article.get("content", ""), matches)
 
             if not article.get("event_date"):
-                event_date, dt_key = extract_event_date(
-                    session=session,
-                    url=article.get("url", ""),
-                    title=article.get("title", ""),
-                    content=article.get("content", ""),
-                    pub_date=article.get("date", "")
-                )
-                article["event_date"] = event_date
-                article["event_date_key"] = dt_key.isoformat() if dt_key else None
+                # Si ya está guardado en el estado previo, reutilizar fecha para evitar peticiones HTTP lentas
+                if known_articles and url in known_articles and known_articles[url].get("event_date"):
+                    article["event_date"] = known_articles[url]["event_date"]
+                    article["event_date_key"] = known_articles[url].get("event_date_key")
+                else:
+                    event_date, dt_key = extract_event_date(
+                        session=session,
+                        url=article.get("url", ""),
+                        title=article.get("title", ""),
+                        content=article.get("content", ""),
+                        pub_date=article.get("date", "")
+                    )
+                    article["event_date"] = event_date
+                    article["event_date_key"] = dt_key.isoformat() if dt_key else None
 
             matched_articles.append(article)
 
@@ -980,7 +985,8 @@ def run(force_future_summary: bool = False):
     process_telegram_updates(cached_future_events)
 
     # PASO 2: Consultar fuentes web para detectar nuevos eventos
-    current_matches = get_all_matched_articles()
+    known_articles = previous_state.get("articulos", {})
+    current_matches = get_all_matched_articles(known_articles=known_articles)
     future_events = get_sorted_future_events(current_matches)
 
     # PASO 3: Procesar Telegram de nuevo por si entraron comandos durante el scrape
@@ -1096,7 +1102,7 @@ def run_listener_loop():
         try:
             # Cada 30 minutos refrescar eventos raspando las webs
             if time.time() - last_scrape > 1800:
-                current_matches = get_all_matched_articles()
+                current_matches = get_all_matched_articles(known_articles=previous_state.get("articulos", {}))
                 future_events = get_sorted_future_events(current_matches)
                 last_scrape = time.time()
 
