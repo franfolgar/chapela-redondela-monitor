@@ -11,6 +11,8 @@ services:
         sync: false
       - key: TELEGRAM_CHAT_ID
         sync: false
+      - key: SUBSCRIBERS_SEED
+        sync: false
       - key: KEYWORDS
         value: Chapela,Redondela
       - key: PYTHON_VERSION

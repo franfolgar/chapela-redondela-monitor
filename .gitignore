@@ -2,5 +2,8 @@
 __pycache__/
 *.pyc
 *.log
-estado_articulos.tmp
+*.tmp
+*.tmp.*
+estado_articulos.json
+suscriptores.json
 .venv/

@@ -24,10 +24,11 @@ import re
 import html
 import time
 import threading
+import hashlib
 from pathlib import Path
 from datetime import datetime, date, timedelta
 from typing import Dict, List, Set, Any, Optional, Tuple
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import urlparse, urlunparse, parse_qs, urlsplit
 from http.server import HTTPServer, ThreadingHTTPServer, BaseHTTPRequestHandler
 
 import requests
@@ -53,6 +54,7 @@ DATA_FILE = BASE_DIR / "estado_articulos.json"
 SUBSCRIBERS_FILE = BASE_DIR / "suscriptores.json"
 LOG_FILE = BASE_DIR / "monitor.log"
 MAX_FUTURE_DAYS = 60  # Ventana máxima de eventos futuros a mostrar (próximos 2 meses)
+DATA_LOCK = threading.Lock()  # Previene condiciones de carrera en lectura/escritura concurrente
 
 MONTH_MAP = {
     "enero": 1, "febrero": 2, "marzo": 3, "abril": 4, "mayo": 5, "junio": 6,
@@ -238,7 +240,7 @@ def extract_event_date(session: requests.Session, url: str, title: str, content:
                 month_name = m_month.group(2).lower()
                 month = MONTH_MAP.get(month_name)
                 year = date.today().year
-                m_yr = re.search(r"\b(202\d)\b", m)
+                m_yr = re.search(r"\b(20\d{2})\b", m)
                 if m_yr:
                     year = int(m_yr.group(1))
                 if month:
@@ -265,7 +267,7 @@ def extract_event_date(session: requests.Session, url: str, title: str, content:
             month_name = m_month.group(2).lower()
             month = MONTH_MAP.get(month_name)
             year = date.today().year
-            m_yr = re.search(r"\b(202\d)\b", event_date_str)
+            m_yr = re.search(r"\b(20\d{2})\b", event_date_str)
             if m_yr:
                 year = int(m_yr.group(1))
             if month:
@@ -509,7 +511,7 @@ def fetch_vigopeques_searches(session: requests.Session, keywords: List[str]) ->
 def fetch_redondela_agenda(session: requests.Session) -> List[Dict[str, Any]]:
     """Extrae eventos oficiales de la Axenda Completa de redondela.gal (The Events Calendar API)."""
     items = []
-    url = "https://redondela.gal/wp-json/tribe/events/v1/events?categories=axenda-completa&per_page=50"
+    url = f"https://redondela.gal/wp-json/tribe/events/v1/events?categories=axenda-completa&per_page=50&start_date={date.today().isoformat()}"
     try:
         logger.info("Consultando Axenda Completa de Concello de Redondela (redondela.gal)...")
         resp = session.get(url, timeout=20)
@@ -680,63 +682,142 @@ def get_future_events_from_state(state: Dict[str, Any], max_days: int = MAX_FUTU
 # ==============================================================================
 
 def load_subscribers() -> Dict[str, Any]:
-    """Carga el listado de suscriptores registrados."""
-    if not SUBSCRIBERS_FILE.exists():
-        if TELEGRAM_CHAT_ID:
-            return {
-                TELEGRAM_CHAT_ID: {
-                    "first_name": "Admin",
-                    "subscribed_at": datetime.now().isoformat()
-                }
-            }
-        return {}
-    try:
-        with open(SUBSCRIBERS_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            if TELEGRAM_CHAT_ID and TELEGRAM_CHAT_ID not in data:
+    """Carga el listado de suscriptores registrados de forma segura y concurrente."""
+    with DATA_LOCK:
+        if not SUBSCRIBERS_FILE.exists():
+            data = {}
+            if TELEGRAM_CHAT_ID:
                 data[TELEGRAM_CHAT_ID] = {
                     "first_name": "Admin",
                     "subscribed_at": datetime.now().isoformat()
                 }
+            # Semilla de suscriptores iniciales mediante variable de entorno si se configuró
+            seed_ids = [s.strip() for s in os.getenv("SUBSCRIBERS_SEED", "").split(",") if s.strip()]
+            for sid in seed_ids:
+                if sid not in data:
+                    data[sid] = {
+                        "first_name": "Suscriptor",
+                        "subscribed_at": datetime.now().isoformat()
+                    }
             return data
-    except Exception as e:
-        logger.error(f"Error al leer {SUBSCRIBERS_FILE}: {e}")
-        return {}
+        try:
+            with open(SUBSCRIBERS_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if TELEGRAM_CHAT_ID and TELEGRAM_CHAT_ID not in data:
+                    data[TELEGRAM_CHAT_ID] = {
+                        "first_name": "Admin",
+                        "subscribed_at": datetime.now().isoformat()
+                    }
+                return data
+        except Exception as e:
+            logger.error(f"Error al leer {SUBSCRIBERS_FILE}: {e}")
+            return {}
 
 
 def save_subscribers(subscribers: Dict[str, Any]) -> None:
-    """Guarda atómicamente el listado de suscriptores."""
-    temp_file = SUBSCRIBERS_FILE.with_suffix(".tmp")
-    with open(temp_file, "w", encoding="utf-8") as f:
-        json.dump(subscribers, f, ensure_ascii=False, indent=2)
-    temp_file.replace(SUBSCRIBERS_FILE)
-    logger.info(f"Listado de suscriptores actualizado con {len(subscribers)} usuarios.")
+    """Guarda atómicamente el listado de suscriptores con bloqueo de concurrencia."""
+    with DATA_LOCK:
+        temp_file = SUBSCRIBERS_FILE.parent / f"{SUBSCRIBERS_FILE.name}.tmp"
+        with open(temp_file, "w", encoding="utf-8") as f:
+            json.dump(subscribers, f, ensure_ascii=False, indent=2)
+        temp_file.replace(SUBSCRIBERS_FILE)
+        logger.info(f"Listado de suscriptores actualizado con {len(subscribers)} usuarios.")
 
 
 def load_previous_state(filepath: Path) -> Dict[str, Any]:
-    """Carga el estado de artículos previamente registrados."""
-    if not filepath.exists():
-        return {}
-    try:
-        with open(filepath, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception as e:
-        logger.error(f"Error al leer {filepath}: {e}. Se reiniciará el estado.")
-        return {}
+    """Carga el estado de artículos previamente registrados con bloqueo de concurrencia."""
+    with DATA_LOCK:
+        if not filepath.exists():
+            return {}
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            logger.error(f"Error al leer {filepath}: {e}. Se reiniciará el estado.")
+            return {}
 
 
 def save_current_state(filepath: Path, state: Dict[str, Any]) -> None:
-    """Guarda atómicamente el estado actual en disco."""
-    temp_file = filepath.with_suffix(".tmp")
-    with open(temp_file, "w", encoding="utf-8") as f:
-        json.dump(state, f, ensure_ascii=False, indent=2)
-    temp_file.replace(filepath)
-    logger.info(f"Estado actualizado en {filepath} con {len(state.get('articulos', {}))} registros.")
+    """Guarda atómicamente el estado actual en disco purgando artículos con más de 60 días de antigüedad."""
+    with DATA_LOCK:
+        # Purgar artículos antiguos para evitar crecimiento ilimitado
+        cutoff_date = (date.today() - timedelta(days=60)).isoformat()
+        articulos = state.get("articulos", {})
+        pruned_articulos = {}
+        for url, item in articulos.items():
+            ev_key = item.get("event_date_key")
+            first_seen = (item.get("first_seen") or "")[:10]
+            ref_date = ev_key or first_seen
+            if not ref_date or ref_date >= cutoff_date:
+                pruned_articulos[url] = item
+
+        state["articulos"] = pruned_articulos
+        state["total_registrados"] = len(pruned_articulos)
+
+        temp_file = filepath.parent / f"{filepath.name}.tmp"
+        with open(temp_file, "w", encoding="utf-8") as f:
+            json.dump(state, f, ensure_ascii=False, indent=2)
+        temp_file.replace(filepath)
+        logger.info(f"Estado actualizado en {filepath} con {len(pruned_articulos)} registros (purgados anteriores a {cutoff_date}).")
 
 
 # ==============================================================================
 # MENSAJES Y NOTIFICACIONES TELEGRAM
 # ==============================================================================
+
+def split_telegram_text(text: str, max_chars: int = 4000) -> List[str]:
+    """Divide texto largo en trozos <= max_chars respetando párrafos, líneas y palabras."""
+    if not text:
+        return []
+    if len(text) <= max_chars:
+        return [text]
+
+    chunks = []
+    paragraphs = text.split("\n\n")
+    current_chunk = ""
+
+    for p in paragraphs:
+        if len(p) > max_chars:
+            if current_chunk:
+                chunks.append(current_chunk.strip())
+                current_chunk = ""
+            lines = p.split("\n")
+            curr_line = ""
+            for line in lines:
+                if len(line) > max_chars:
+                    words = line.split(" ")
+                    curr_word = ""
+                    for w in words:
+                        if len(curr_word) + len(w) + 1 > max_chars:
+                            if curr_word:
+                                chunks.append(curr_word.strip())
+                            curr_word = w
+                        else:
+                            curr_word = f"{curr_word} {w}" if curr_word else w
+                    if curr_word:
+                        chunks.append(curr_word.strip())
+                else:
+                    if len(curr_line) + len(line) + 1 > max_chars:
+                        if curr_line:
+                            chunks.append(curr_line.strip())
+                        curr_line = line
+                    else:
+                        curr_line = f"{curr_line}\n{line}" if curr_line else line
+            if curr_line:
+                chunks.append(curr_line.strip())
+        else:
+            if len(current_chunk) + len(p) + 2 > max_chars:
+                if current_chunk:
+                    chunks.append(current_chunk.strip())
+                current_chunk = p
+            else:
+                current_chunk = f"{current_chunk}\n\n{p}" if current_chunk else p
+
+    if current_chunk:
+        chunks.append(current_chunk.strip())
+
+    return [c for c in chunks if c.strip()]
+
 
 def send_telegram_message(chat_id: str, message: str) -> bool:
     """Envía un mensaje con formato HTML a un chat concreto de Telegram, dividiendo de forma segura si excede el límite de 4096 caracteres."""
@@ -744,25 +825,9 @@ def send_telegram_message(chat_id: str, message: str) -> bool:
         return False
 
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    MAX_LENGTH = 4000
-
-    if len(message) <= MAX_LENGTH:
-        chunks = [message]
-    else:
-        paragraphs = message.split("\n\n")
-        chunks = []
-        curr = ""
-        for p in paragraphs:
-            if len(curr) + len(p) + 2 > MAX_LENGTH:
-                if curr:
-                    chunks.append(curr.strip())
-                curr = p
-            else:
-                curr = f"{curr}\n\n{p}" if curr else p
-        if curr:
-            chunks.append(curr.strip())
-
+    chunks = split_telegram_text(message, max_chars=4000)
     success = True
+
     for chunk in chunks:
         payload = {
             "chat_id": chat_id,
@@ -781,14 +846,15 @@ def send_telegram_message(chat_id: str, message: str) -> bool:
 
 
 def broadcast_telegram_message(message: str) -> None:
-    """Difunde un mensaje a todos los suscriptores registrados."""
+    """Difunde un mensaje a todos los suscriptores registrados con control de tasa de Telegram."""
     subscribers = load_subscribers()
     if not subscribers and TELEGRAM_CHAT_ID:
         send_telegram_message(TELEGRAM_CHAT_ID, message)
         return
 
-    for cid in subscribers.keys():
+    for cid in list(subscribers.keys()):
         send_telegram_message(cid, message)
+        time.sleep(0.05)  # 50ms rate limit protection
 
 
 def build_future_events_text(future_events: List[Dict[str, Any]]) -> str:
@@ -862,17 +928,32 @@ def format_article_message(article: Dict[str, Any]) -> str:
 # GESTIÓN DE ACTUALIZACIONES TELEGRAM (NUEVOS USUARIOS /START Y COMANDOS)
 # ==============================================================================
 
+def get_webhook_secret() -> str:
+    """Obtiene o genera un token seguro para autenticar las peticiones del webhook de Telegram."""
+    secret = os.getenv("WEBHOOK_SECRET", "").strip()
+    if not secret and TELEGRAM_TOKEN:
+        # Generar hash determinista de 32 caracteres alfanuméricos válido para Telegram
+        secret = hashlib.sha256(f"telegram_secret_salt_{TELEGRAM_TOKEN}".encode()).hexdigest()[:32]
+    return secret
+
+
 def configure_telegram_webhook(base_url: str) -> bool:
-    """Configura el webhook de Telegram apuntando a la URL pública de Render."""
+    """Configura el webhook de Telegram con secret_token apuntando a Render."""
     if not TELEGRAM_TOKEN or not base_url:
         return False
     webhook_url = f"{base_url.rstrip('/')}/webhook"
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/setWebhook"
+    secret_token = get_webhook_secret()
+    payload = {
+        "url": webhook_url,
+        "secret_token": secret_token,
+        "drop_pending_updates": False,
+    }
     try:
-        resp = requests.post(url, json={"url": webhook_url}, timeout=15)
+        resp = requests.post(url, json=payload, timeout=15)
         data = resp.json()
         if data.get("ok"):
-            logger.info(f"Webhook de Telegram configurado con éxito hacia: {webhook_url}")
+            logger.info(f"Webhook de Telegram autenticado (con secret_token) configurado hacia: {webhook_url}")
             return True
         else:
             logger.error(f"Fallo al configurar webhook en Telegram: {data}")
@@ -995,6 +1076,10 @@ def process_telegram_updates(future_events: List[Dict[str, Any]], poll_timeout: 
         resp = requests.get(url, params=params, timeout=req_timeout)
         data = resp.json()
         if not data.get("ok"):
+            if data.get("error_code") == 409:
+                logger.debug("Webhook activo en Telegram; consulta getUpdates omitida para evitar conflicto 409.")
+            else:
+                logger.warning(f"Respuesta no OK de Telegram getUpdates: {data}")
             return
 
         updates = data.get("result", [])
@@ -1020,7 +1105,6 @@ def process_telegram_updates(future_events: List[Dict[str, Any]], poll_timeout: 
             requests.get(f"{url}?offset={max_update_id + 1}&limit=1", timeout=10)
 
     except Exception as e:
-        logger.error(f"Error procesando actualizaciones de Telegram: {e}")
         logger.error(f"Error procesando actualizaciones de Telegram: {e}")
 
 
@@ -1165,7 +1249,22 @@ class TelegramWebhookHandler(BaseHTTPRequestHandler):
                 "timestamp": datetime.now().isoformat(),
             }
             self.wfile.write(json.dumps(resp, ensure_ascii=False).encode("utf-8"))
-        elif self.path == "/refresh":
+        elif self.path.startswith("/refresh"):
+            # Protección contra DoS: requiere token de autenticación
+            expected_secret = get_webhook_secret()
+            query_token = ""
+            if "?" in self.path:
+                qs = parse_qs(urlsplit(self.path).query)
+                query_token = qs.get("token", [""])[0]
+            header_token = self.headers.get("X-Admin-Token", "")
+
+            if expected_secret and (query_token != expected_secret and header_token != expected_secret):
+                self.send_response(403)
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(b"Acceso denegado: token invalido. Use /refresh?token=...\n")
+                return
+
             self.send_response(200)
             self.send_header("Content-Type", "text/plain; charset=utf-8")
             self.end_headers()
@@ -1177,6 +1276,16 @@ class TelegramWebhookHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         if self.path in ("/webhook", f"/webhook/{TELEGRAM_TOKEN}"):
+            expected_secret = get_webhook_secret()
+            received_secret = self.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+            if expected_secret and received_secret != expected_secret:
+                logger.warning("Intento de acceso denegado a /webhook: secret_token ausente o invalido.")
+                self.send_response(401)
+                self.send_header("Content-Type", "text/plain")
+                self.end_headers()
+                self.wfile.write(b"Unauthorized")
+                return
+
             try:
                 content_length = int(self.headers.get("Content-Length", 0))
                 body = self.rfile.read(content_length).decode("utf-8")

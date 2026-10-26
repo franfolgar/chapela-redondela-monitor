@@ -73,47 +73,40 @@ run_monitor.bat
 
 ---
 
-## ⏰ Programación Automática
+## ⏰ Modos de Ejecución
 
-Tienes dos formas de dejarlo funcionando de manera 100% automática:
+El bot está diseñado para operar principalmente en **Render** como servidor 24/7 con Webhook de Telegram.
 
-### Opción 1: En tu ordenador Windows (Programador de Tareas)
-
-Para que se ejecute todos los días a las **10:00 AM**:
-```powershell
-schtasks /create /tn "ChapelaRedondelaMonitor" /tr "C:\Users\fran_\.gemini\antigravity\scratch\chapela-redondela-monitor\run_monitor.bat" /sc daily /st 10:00 /f
-```
-
-O si prefieres que revise varias veces al día (por ejemplo cada 4 horas):
-```powershell
-schtasks /create /tn "ChapelaRedondelaMonitor" /tr "C:\Users\fran_\.gemini\antigravity\scratch\chapela-redondela-monitor\run_monitor.bat" /sc hourly /mo 4 /f
-```
-
-*(Si en el futuro deseas borrar la tarea programada: `schtasks /delete /tn "ChapelaRedondelaMonitor" /f`)*
-
----
-
-### Opción 2: En la nube 24/7 con Render (Web Service + Webhook Instantáneo)
+### Opción 1 (Recomendada): En la nube 24/7 con Render (Web Service + Webhook Instantáneo)
 
 El repositorio incluye el archivo [`render.yaml`](file:///C:/Users/fran_/.gemini/antigravity/scratch/chapela-redondela-monitor/render.yaml) para desplegar el bot en **Render**:
-- **Respuestas instantáneas**: Configura el webhook de Telegram automáticamente para responder a `/eventos`, `/start` y `/ayuda` en menos de 1 segundo.
+- **Respuestas instantáneas**: Configura el webhook autenticado de Telegram (`secret_token`) automáticamente para responder a `/eventos`, `/start` y `/ayuda` en menos de 1 segundo.
 - **Scraping continuo**: Incluye un hilo en segundo plano que revisa novedades cada 30 minutos y avisa a los suscriptores.
 - **Healthcheck**: Endpoint `/` con estado y contadores en tiempo real.
 
 Para desplegarlo en Render:
-1. En tu panel de Render, pulsa **New** > **Blueprint** (o **Web Service**) y conecta el repositorio `franfolgar/chapela-redondela-monitor`.
-2. Añade las variables de entorno:
+1. En tu panel de Render, pulsa **New** > **Blueprint** y conecta el repositorio `franfolgar/chapela-redondela-monitor`.
+2. Añade las variables de entorno secretas:
    - `TELEGRAM_TOKEN`: Tu token de bot de Telegram.
    - `TELEGRAM_CHAT_ID`: Tu ID de chat administrador.
+   - `SUBSCRIBERS_SEED`: (Opcional) IDs de suscriptores iniciales separados por coma (ej. `12345678,87654321`).
 3. ¡Listo! Render desplegará el servicio y configurará el Webhook automáticamente.
 
 ---
 
-### Opción 3: En la nube con GitHub Actions (Programado cada 4 horas)
+### Opción 2: Pruebas aisladas en GitHub Actions (Manual)
 
-El repositorio incluye el archivo listo en `.github/workflows/monitor.yml`.
-Está configurado para ejecutarse automáticamente **6 veces al día** (cada 4 horas: sobre las 09:25, 13:25, 17:25, 21:25, 01:25 y 05:25 hora española peninsular):
+El archivo `.github/workflows/monitor.yml` está disponible para pruebas manuales bajo demanda desde la pestaña **Actions** de GitHub (`workflow_dispatch`). Al operar con Webhook en Render, los cron jobs automáticos de Actions están desactivados para evitar conflictos de Telegram y alertas duplicadas.
 
-1. Sube este repositorio a tu cuenta de GitHub (`franfolgar/chapela-redondela-monitor`).
-2. Los secretos de Telegram (`TELEGRAM_TOKEN` y `TELEGRAM_CHAT_ID`) se configuran automáticamente en **Settings** -> **Secrets and variables** -> **Actions**.
-3. Se ejecutará todos los días en los servidores de GitHub sin depender de tener el ordenador encendido.
+---
+
+### Opción 3: Ejecución local en Windows
+
+Para pruebas en local sin webhook:
+```powershell
+# Ejecución puntual:
+python monitor.py
+
+# O en segundo plano:
+run_monitor.bat
+```
