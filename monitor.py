@@ -24,7 +24,7 @@ import re
 import html
 import time
 from pathlib import Path
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from typing import Dict, List, Set, Any, Optional, Tuple
 from urllib.parse import urlparse, urlunparse
 
@@ -50,6 +50,7 @@ KEYWORDS = [k.strip() for k in raw_keywords.split(",") if k.strip()]
 DATA_FILE = BASE_DIR / "estado_articulos.json"
 SUBSCRIBERS_FILE = BASE_DIR / "suscriptores.json"
 LOG_FILE = BASE_DIR / "monitor.log"
+MAX_FUTURE_DAYS = 60  # Ventana máxima de eventos futuros a mostrar (próximos 2 meses)
 
 MONTH_MAP = {
     "enero": 1, "febrero": 2, "marzo": 3, "abril": 4, "mayo": 5, "junio": 6,
@@ -234,7 +235,7 @@ def extract_event_date(session: requests.Session, url: str, title: str, content:
                 day = int(m_month.group(1))
                 month_name = m_month.group(2).lower()
                 month = MONTH_MAP.get(month_name)
-                year = 2026
+                year = date.today().year
                 m_yr = re.search(r"\b(202\d)\b", m)
                 if m_yr:
                     year = int(m_yr.group(1))
@@ -261,7 +262,7 @@ def extract_event_date(session: requests.Session, url: str, title: str, content:
             day = int(m_month.group(1))
             month_name = m_month.group(2).lower()
             month = MONTH_MAP.get(month_name)
-            year = 2026
+            year = date.today().year
             m_yr = re.search(r"\b(202\d)\b", event_date_str)
             if m_yr:
                 year = int(m_yr.group(1))
@@ -623,27 +624,29 @@ def get_all_matched_articles() -> List[Dict[str, Any]]:
     return matched_articles
 
 
-def get_sorted_future_events(articles: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Filtra y ordena cronológicamente los eventos futuros desde la fecha actual."""
+def get_sorted_future_events(articles: List[Dict[str, Any]], max_days: int = MAX_FUTURE_DAYS) -> List[Dict[str, Any]]:
+    """Filtra y ordena cronológicamente los eventos futuros dentro de la ventana de días configurada (evita eventos de 2027 o lejanos)."""
     today = date.today()
+    limit_date = today + timedelta(days=max_days)
     future_events = []
     seen_urls = set()
 
     for art in articles:
-        if not is_allowed_section(art.get("url", "")):
+        url = art.get("url", "")
+        if not url or not is_allowed_section(url):
             continue
 
         date_key_str = art.get("event_date_key")
         if date_key_str:
             try:
                 dt_key = date.fromisoformat(date_key_str)
-                if dt_key >= today and art["url"] not in seen_urls:
-                    seen_urls.add(art["url"])
+                if today <= dt_key <= limit_date and url not in seen_urls:
+                    seen_urls.add(url)
                     future_events.append({
                         "dt_key": dt_key,
                         "event_date": art.get("event_date", ""),
                         "title": art.get("title", ""),
-                        "url": art.get("url", ""),
+                        "url": url,
                         "source": art.get("source", ""),
                     })
             except Exception:
@@ -651,6 +654,18 @@ def get_sorted_future_events(articles: List[Dict[str, Any]]) -> List[Dict[str, A
 
     future_events.sort(key=lambda x: x["dt_key"])
     return future_events
+
+
+def get_future_events_from_state(state: Dict[str, Any], max_days: int = MAX_FUTURE_DAYS) -> List[Dict[str, Any]]:
+    """Extrae y formatea la lista de eventos futuros a partir del diccionario de artículos guardado en caché."""
+    articles_list = []
+    for url, data in state.get("articulos", {}).items():
+        if not is_allowed_section(url):
+            continue
+        item = dict(data)
+        item["url"] = url
+        articles_list.append(item)
+    return get_sorted_future_events(articles_list, max_days=max_days)
 
 
 # ==============================================================================
@@ -717,26 +732,45 @@ def save_current_state(filepath: Path, state: Dict[str, Any]) -> None:
 # ==============================================================================
 
 def send_telegram_message(chat_id: str, message: str) -> bool:
-    """Envía un mensaje con formato HTML a un chat concreto de Telegram."""
+    """Envía un mensaje con formato HTML a un chat concreto de Telegram, dividiendo de forma segura si excede el límite de 4096 caracteres."""
     if not TELEGRAM_TOKEN or not chat_id:
         return False
 
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    payload = {
-        "chat_id": chat_id,
-        "text": message,
-        "parse_mode": "HTML",
-        "disable_web_page_preview": False,
-    }
+    MAX_LENGTH = 4000
 
-    try:
-        resp = requests.post(url, json=payload, timeout=20)
-        resp.raise_for_status()
-        logger.info(f"Mensaje enviado con éxito a chat {chat_id}.")
-        return True
-    except Exception as e:
-        logger.error(f"Error al enviar mensaje a Telegram (chat {chat_id}): {e}")
-        return False
+    if len(message) <= MAX_LENGTH:
+        chunks = [message]
+    else:
+        paragraphs = message.split("\n\n")
+        chunks = []
+        curr = ""
+        for p in paragraphs:
+            if len(curr) + len(p) + 2 > MAX_LENGTH:
+                if curr:
+                    chunks.append(curr.strip())
+                curr = p
+            else:
+                curr = f"{curr}\n\n{p}" if curr else p
+        if curr:
+            chunks.append(curr.strip())
+
+    success = True
+    for chunk in chunks:
+        payload = {
+            "chat_id": chat_id,
+            "text": chunk,
+            "parse_mode": "HTML",
+            "disable_web_page_preview": False,
+        }
+        try:
+            resp = requests.post(url, json=payload, timeout=20)
+            resp.raise_for_status()
+            logger.info(f"Mensaje ({len(chunk)} chars) enviado con éxito a chat {chat_id}.")
+        except Exception as e:
+            logger.error(f"Error al enviar mensaje a Telegram (chat {chat_id}): {e}")
+            success = False
+    return success
 
 
 def broadcast_telegram_message(message: str) -> None:
@@ -753,7 +787,7 @@ def broadcast_telegram_message(message: str) -> None:
 def build_future_events_text(future_events: List[Dict[str, Any]]) -> str:
     """Construye las líneas de texto formateadas de eventos futuros."""
     if not future_events:
-        return "<i>No hay eventos programados en este momento.</i>"
+        return f"<i>No hay eventos programados en los próximos {MAX_FUTURE_DAYS} días.</i>"
 
     lineas = []
     for ev in future_events:
@@ -763,6 +797,18 @@ def build_future_events_text(future_events: List[Dict[str, Any]]) -> str:
         lineas.append(f"• [<b>{d}</b>] <a href=\"{u}\">{t}</a>")
 
     return "\n\n".join(lineas)
+
+
+def build_events_summary_message(first_name: str, future_events: List[Dict[str, Any]]) -> str:
+    """Construye la respuesta directa para el comando /eventos o /agenda."""
+    nombre = f", <b>{escape_telegram_html(first_name)}</b>" if first_name else ""
+    cartelera = build_future_events_text(future_events)
+    return (
+        f"📅 <b>CARTELERA DE EVENTOS - CHAPELA Y REDONDELA</b> 📍\n\n"
+        f"Próximos planes y citas confirmadas para las próximas semanas{nombre}:\n\n"
+        f"{cartelera}\n\n"
+        f"🔔 <i>Te avisaremos al instante con cada nuevo evento en cuanto se publique.</i>"
+    )
 
 
 def build_welcome_message(first_name: str, future_events: List[Dict[str, Any]]) -> str:
@@ -775,10 +821,10 @@ def build_welcome_message(first_name: str, future_events: List[Dict[str, Any]]) 
 
     message = (
         f"👋 ¡Hola, <b>{nombre_limpio}</b>! Bienvenido/a al <b>Bot de Eventos de Chapela y Redondela</b> 📍\n\n"
-        f"A continuación tienes la <b>cartelera completa de todos los eventos futuros</b> ya publicados en la comarca para que no te pierdas ninguno:\n\n"
+        f"A continuación tienes la <b>cartelera de los próximos eventos</b> confirmados en la comarca para que no te pierdas ninguno:\n\n"
         f"{cartelera}\n\n"
         f"🔔 <b>¿Cómo funciona?</b>\n"
-        f"Cada vez que se publique una nueva fiesta, magosto, festival o plan cultural en <b>VigoPeques</b> o la <b>Agenda de Metropolitano</b>, recibirás un aviso automático al momento por aquí.\n\n"
+        f"Cada vez que se publique una nueva fiesta, magosto, festival o plan cultural en <b>Metropolitano</b>, <b>VigoPeques</b> o la <b>Axenda do Concello de Redondela</b>, recibirás un aviso automático al momento por aquí.\n\n"
         f"<i>¡Disfruta de los planes de nuestra tierra!</i>"
     )
     return message
@@ -809,12 +855,12 @@ def format_article_message(article: Dict[str, Any]) -> str:
 # GESTIÓN DE ACTUALIZACIONES TELEGRAM (NUEVOS USUARIOS /START)
 # ==============================================================================
 
-def process_telegram_updates(future_events: List[Dict[str, Any]]) -> None:
+def process_telegram_updates(future_events: List[Dict[str, Any]], poll_timeout: int = 0) -> None:
     """
     Consulta getUpdates en Telegram:
     - Identifica a nuevos usuarios que hayan iniciado el bot (/start).
-    - Les envía el mensaje de bienvenida con el resumen completo de eventos futuros.
-    - Actualiza y guarda el registro en suscriptores.json.
+    - Responde al instante a /eventos, /start o /ayuda.
+    - Soporta long polling mediante poll_timeout para respuesta en tiempo real sin latencia.
     - Confirma los mensajes procesados con offset para no duplicar.
     """
     if not TELEGRAM_TOKEN:
@@ -822,9 +868,13 @@ def process_telegram_updates(future_events: List[Dict[str, Any]]) -> None:
 
     subscribers = load_subscribers()
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getUpdates"
+    params = {}
+    if poll_timeout > 0:
+        params["timeout"] = poll_timeout
 
     try:
-        resp = requests.get(url, timeout=10)
+        req_timeout = (poll_timeout + 5) if poll_timeout > 0 else 10
+        resp = requests.get(url, params=params, timeout=req_timeout)
         data = resp.json()
         if not data.get("ok"):
             return
@@ -855,9 +905,10 @@ def process_telegram_updates(future_events: List[Dict[str, Any]]) -> None:
             if not cid:
                 continue
 
-            # Si es nuevo usuario o solicita /start o /eventos
             is_new_user = cid not in subscribers
-            is_start_cmd = text.startswith("/start") or text.startswith("/eventos") or text.startswith("/agenda")
+            is_start_cmd = text.startswith("/start")
+            is_events_cmd = text.startswith("/eventos") or text.startswith("/agenda") or text.startswith("/cartelera")
+            is_help_cmd = text.startswith("/ayuda") or text.startswith("/help")
 
             if is_new_user:
                 logger.info(f"Nuevo suscriptor detectado: {first_name} (@{username}) [ID: {cid}]")
@@ -869,17 +920,38 @@ def process_telegram_updates(future_events: List[Dict[str, Any]]) -> None:
                 }
                 new_users_added = True
 
-                # Enviar bienvenida personalizada con cartelera de eventos futuros
+                # Enviar bienvenida personalizada con cartelera de próximos eventos
                 welcome_msg = build_welcome_message(first_name, future_events)
                 send_telegram_message(cid, welcome_msg)
 
+            elif is_events_cmd:
+                # Consulta de cartelera por usuario existente
+                logger.info(f"Comando de eventos de {first_name} [ID: {cid}]")
+                subscribers[cid]["last_interaction"] = datetime.now().isoformat()
+                new_users_added = True
+                summary_msg = build_events_summary_message(first_name, future_events)
+                send_telegram_message(cid, summary_msg)
+
             elif is_start_cmd:
-                # Usuario existente solicitando cartelera
-                logger.info(f"Comando '{text}' de suscriptor existente: {first_name} [ID: {cid}]")
+                # Reinicio /start de usuario existente
+                logger.info(f"Comando /start de suscriptor existente: {first_name} [ID: {cid}]")
                 subscribers[cid]["last_interaction"] = datetime.now().isoformat()
                 new_users_added = True
                 welcome_msg = build_welcome_message(first_name, future_events)
                 send_telegram_message(cid, welcome_msg)
+
+            elif is_help_cmd:
+                # Comando de ayuda
+                logger.info(f"Comando de ayuda de {first_name} [ID: {cid}]")
+                help_msg = (
+                    "ℹ️ <b>BOT DE EVENTOS DE CHAPELA Y REDONDELA</b> 📍\n\n"
+                    "Comandos disponibles:\n"
+                    "• /eventos - Cartelera de las próximas semanas.\n"
+                    "• /start - Mensaje de bienvenida e información inicial.\n"
+                    "• /ayuda - Muestra esta ayuda.\n\n"
+                    "<i>Recibirás un aviso automático en cuanto se detecte cualquier nuevo evento en Chapela o Redondela.</i>"
+                )
+                send_telegram_message(cid, help_msg)
 
         if new_users_added:
             save_subscribers(subscribers)
@@ -901,13 +973,18 @@ def run(force_future_summary: bool = False):
     logger.info(f"Iniciando monitorización: Chapela & Redondela ({datetime.now().isoformat()})")
     logger.info("=================================================================")
 
+    # PASO 1: Cargar estado previo y responder a Telegram DE INMEDIATO (< 1 seg)
+    # Evita que el usuario tenga que esperar mientras se consultan las webs.
+    previous_state = load_previous_state(DATA_FILE)
+    cached_future_events = get_future_events_from_state(previous_state)
+    process_telegram_updates(cached_future_events)
+
+    # PASO 2: Consultar fuentes web para detectar nuevos eventos
     current_matches = get_all_matched_articles()
     future_events = get_sorted_future_events(current_matches)
 
-    # 1. Procesar a cualquier nuevo usuario que haya pulsado /start
+    # PASO 3: Procesar Telegram de nuevo por si entraron comandos durante el scrape
     process_telegram_updates(future_events)
-
-    previous_state = load_previous_state(DATA_FILE)
 
     cleaned_saved_articles = {}
     for url, art in previous_state.get("articulos", {}).items():
@@ -940,7 +1017,7 @@ def run(force_future_summary: bool = False):
         cartelera = build_future_events_text(future_events)
         msg = (
             "📅 <b>AGENDA & QUÉ HACER - EVENTOS FUTUROS</b>\n\n"
-            "Convocatorias y planes publicados para Chapela y Redondela:\n\n"
+            f"Convocatorias y planes publicados para Chapela y Redondela (próximos {MAX_FUTURE_DAYS} días):\n\n"
             f"{cartelera}\n\n"
             "🔔 <i>Recibirás un aviso inmediato con cada nuevo evento que se publique.</i>"
         )
@@ -953,7 +1030,7 @@ def run(force_future_summary: bool = False):
         cartelera = build_future_events_text(future_events)
         msg = (
             "📅 <b>AGENDA & QUÉ HACER - EVENTOS FUTUROS</b>\n\n"
-            "Convocatorias y planes publicados para Chapela y Redondela:\n\n"
+            f"Convocatorias y planes publicados para Chapela y Redondela (próximos {MAX_FUTURE_DAYS} días):\n\n"
             f"{cartelera}\n\n"
             "🔔 <i>Recibirás un aviso inmediato con cada nuevo evento que se publique.</i>"
         )
@@ -1007,30 +1084,30 @@ def run(force_future_summary: bool = False):
 
 def run_listener_loop():
     """
-    Bucle de escucha interactivo en tiempo real.
-    Permite responder a /start y comandos en menos de 1 segundo de forma continua.
+    Bucle de escucha interactivo en tiempo real con long polling.
+    Permite responder a /start, /eventos y comandos en menos de 0.5 segundos de forma continua.
     """
-    logger.info("Iniciando bucle de escucha en tiempo real de Telegram...")
-    current_matches = get_all_matched_articles()
-    future_events = get_sorted_future_events(current_matches)
-    last_refresh = time.time()
+    logger.info("Iniciando bucle de escucha en tiempo real de Telegram (long-polling)...")
+    previous_state = load_previous_state(DATA_FILE)
+    future_events = get_future_events_from_state(previous_state)
+    last_scrape = 0.0
 
     while True:
         try:
-            # Cada 30 minutos refrescar eventos
-            if time.time() - last_refresh > 1800:
+            # Cada 30 minutos refrescar eventos raspando las webs
+            if time.time() - last_scrape > 1800:
                 current_matches = get_all_matched_articles()
                 future_events = get_sorted_future_events(current_matches)
-                last_refresh = time.time()
+                last_scrape = time.time()
 
-            process_telegram_updates(future_events)
-            time.sleep(2)
+            # Long polling con timeout=20s (devuelve respuesta instantánea si llega un comando)
+            process_telegram_updates(future_events, poll_timeout=20)
         except KeyboardInterrupt:
             logger.info("Escucha detenida por el usuario.")
             break
         except Exception as e:
             logger.error(f"Error en bucle de escucha: {e}")
-            time.sleep(5)
+            time.sleep(3)
 
 
 if __name__ == "__main__":
