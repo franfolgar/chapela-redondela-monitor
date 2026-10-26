@@ -684,6 +684,7 @@ def get_future_events_from_state(state: Dict[str, Any], max_days: int = MAX_FUTU
 def load_subscribers() -> Dict[str, Any]:
     """Carga el listado de suscriptores registrados de forma segura y concurrente."""
     with DATA_LOCK:
+        seed_ids = [s.strip() for s in os.getenv("SUBSCRIBERS_SEED", "").split(",") if s.strip()]
         if not SUBSCRIBERS_FILE.exists():
             data = {}
             if TELEGRAM_CHAT_ID:
@@ -691,24 +692,47 @@ def load_subscribers() -> Dict[str, Any]:
                     "first_name": "Admin",
                     "subscribed_at": datetime.now().isoformat()
                 }
-            # Semilla de suscriptores iniciales mediante variable de entorno si se configuró
-            seed_ids = [s.strip() for s in os.getenv("SUBSCRIBERS_SEED", "").split(",") if s.strip()]
             for sid in seed_ids:
                 if sid not in data:
                     data[sid] = {
                         "first_name": "Suscriptor",
                         "subscribed_at": datetime.now().isoformat()
                     }
+            if data:
+                try:
+                    temp_file = SUBSCRIBERS_FILE.parent / f"{SUBSCRIBERS_FILE.name}.tmp"
+                    with open(temp_file, "w", encoding="utf-8") as f:
+                        json.dump(data, f, ensure_ascii=False, indent=2)
+                    temp_file.replace(SUBSCRIBERS_FILE)
+                except Exception as e:
+                    logger.error(f"Error inicializando {SUBSCRIBERS_FILE}: {e}")
             return data
         try:
             with open(SUBSCRIBERS_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                if TELEGRAM_CHAT_ID and TELEGRAM_CHAT_ID not in data:
-                    data[TELEGRAM_CHAT_ID] = {
-                        "first_name": "Admin",
+            changed = False
+            if TELEGRAM_CHAT_ID and TELEGRAM_CHAT_ID not in data:
+                data[TELEGRAM_CHAT_ID] = {
+                    "first_name": "Admin",
+                    "subscribed_at": datetime.now().isoformat()
+                }
+                changed = True
+            for sid in seed_ids:
+                if sid not in data:
+                    data[sid] = {
+                        "first_name": "Suscriptor",
                         "subscribed_at": datetime.now().isoformat()
                     }
-                return data
+                    changed = True
+            if changed:
+                try:
+                    temp_file = SUBSCRIBERS_FILE.parent / f"{SUBSCRIBERS_FILE.name}.tmp"
+                    with open(temp_file, "w", encoding="utf-8") as f:
+                        json.dump(data, f, ensure_ascii=False, indent=2)
+                    temp_file.replace(SUBSCRIBERS_FILE)
+                except Exception as e:
+                    logger.error(f"Error actualizando {SUBSCRIBERS_FILE} con semillas: {e}")
+            return data
         except Exception as e:
             logger.error(f"Error al leer {SUBSCRIBERS_FILE}: {e}")
             return {}
@@ -1116,6 +1140,9 @@ def run(force_future_summary: bool = False):
     logger.info("=================================================================")
     logger.info(f"Iniciando monitorización: Chapela & Redondela ({datetime.now().isoformat()})")
     logger.info("=================================================================")
+
+    # Asegurar que el webhook de Telegram esté deshabilitado para permitir getUpdates sin conflictos (error 409)
+    delete_telegram_webhook()
 
     # PASO 1: Cargar estado previo y responder a Telegram DE INMEDIATO (< 1 seg)
     # Evita que el usuario tenga que esperar mientras se consultan las webs.

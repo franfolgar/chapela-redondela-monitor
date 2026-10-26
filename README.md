@@ -75,28 +75,23 @@ run_monitor.bat
 
 ## ⏰ Modos de Ejecución
 
-El bot está diseñado para operar principalmente en **Render** como servidor 24/7 con Webhook de Telegram.
+### Opción 1 (Recomendada): Automatización Programada 2 Veces al Día en GitHub Actions (100% Gratis, 0 Horas de Servidor)
 
-### Opción 1 (Recomendada): En la nube 24/7 con Render (Web Service + Webhook Instantáneo)
+El bot está configurado para ejecutarse automáticamente mediante **GitHub Actions** dos veces al día:
+- **Mañana**: ~10:15 CET (hora peninsular española).
+- **Tarde**: ~15:35 CET (hora peninsular española).
 
-El repositorio incluye el archivo [`render.yaml`](file:///C:/Users/fran_/.gemini/antigravity/scratch/chapela-redondela-monitor/render.yaml) para desplegar el bot en **Render**:
-- **Respuestas instantáneas**: Configura el webhook autenticado de Telegram (`secret_token`) automáticamente para responder a `/eventos`, `/start` y `/ayuda` en menos de 1 segundo.
-- **Scraping continuo**: Incluye un hilo en segundo plano que revisa novedades cada 30 minutos y avisa a los suscriptores.
-- **Healthcheck**: Endpoint `/` con estado y contadores en tiempo real.
-
-Para desplegarlo en Render:
-1. En tu panel de Render, pulsa **New** > **Blueprint** y conecta el repositorio `franfolgar/chapela-redondela-monitor`.
-2. Añade las variables de entorno secretas:
-   - `TELEGRAM_TOKEN`: Tu token de bot de Telegram.
-   - `TELEGRAM_CHAT_ID`: Tu ID de chat administrador.
-   - `SUBSCRIBERS_SEED`: (Opcional) IDs de suscriptores iniciales separados por coma (ej. `12345678,87654321`).
-3. ¡Listo! Render desplegará el servicio y configurará el Webhook automáticamente.
+**Ventajas clave:**
+- **0 horas de Render consumidas**: No gasta la cuota mensual de 750 horas de Render, dejándola disponible para otros proyectos.
+- **Persistencia en Git**: Actualiza automáticamente `estado_articulos.json` en el repositorio para no duplicar nunca alertas.
+- **Suscriptores seguros**: Mantiene la lista de suscriptores privada mediante `SUBSCRIBERS_SEED` en GitHub Secrets y la caché segura de GitHub Actions, sin exponer datos personales en commits públicos.
+- **Ejecución manual**: Puedes lanzar una comprobación cuando quieras desde la pestaña **Actions** en GitHub pulsando en *Run workflow*.
 
 ---
 
-### Opción 2: Pruebas aisladas en GitHub Actions (Manual)
+### Opción 2: Servidor 24/7 en Render (Web Service opcional)
 
-El archivo `.github/workflows/monitor.yml` está disponible para pruebas manuales bajo demanda desde la pestaña **Actions** de GitHub (`workflow_dispatch`). Al operar con Webhook en Render, los cron jobs automáticos de Actions están desactivados para evitar conflictos de Telegram y alertas duplicadas.
+Si se prefiere una respuesta interactiva en tiempo real (< 1 segundo a comandos `/eventos`), el repositorio incluye [`render.yaml`](file:///C:/Users/fran_/.gemini/antigravity/scratch/chapela-redondela-monitor/render.yaml). Ten en cuenta que un servicio 24/7 en Render consume unas ~720 horas/mes de la cuota compartida de tu workspace. Si se utiliza GitHub Actions, el servicio de Render puede permanecer suspendido o eliminado.
 
 ---
 

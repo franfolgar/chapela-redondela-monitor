@@ -1,0 +1,440 @@
+{
+  "created_at": "2026-10-24T22:20:19.323545",
+  "last_check": "2026-10-26T19:23:23.288803",
+  "total_registrados": 43,
+  "articulos": {
+    "https://metropolitano.gal/agenda/magosto-y-tunel-del-terror-en-chapela/": {
+      "title": "Magosto y Túnel del terror en Chapela",
+      "source": "Metropolitano (Agenda)",
+      "matched_keywords": [
+        "Chapela"
+      ],
+      "first_seen": "2026-10-24T22:20:19.323545",
+      "notified_at": "2026-10-24T22:20:19.323545",
+      "event_date": "Sábado, 24 de octubre 5:00pm",
+      "event_date_key": "2026-10-24"
+    },
+    "https://metropolitano.gal/agenda/magosto-en-la-antigua-estacion-de-chapela/": {
+      "title": "Magosto en la antigua Estación de Chapela",
+      "source": "Metropolitano (Agenda)",
+      "matched_keywords": [
+        "Chapela"
+      ],
+      "first_seen": "2026-10-24T22:20:19.323545",
+      "notified_at": "2026-10-24T22:20:19.323545",
+      "event_date": "Sábado, 7 de noviembre 7:00pm",
+      "event_date_key": "2026-11-07"
+    },
+    "https://metropolitano.gal/agenda/conmemoriacion-da-batalla-de-rande/": {
+      "title": "Conmemoriación da Batalla de Rande",
+      "source": "Metropolitano (Agenda)",
+      "matched_keywords": [
+        "Redondela"
+      ],
+      "first_seen": "2026-10-24T22:20:19.323545",
+      "notified_at": "2026-10-24T22:20:19.323545",
+      "event_date": "Sábado, 17 de octubre 12:30pm",
+      "event_date_key": "2026-10-17"
+    },
+    "https://metropolitano.gal/que-hacer/desfile-de-monstruos-tunel-del-terror-y-seres-fantasticos-para-un-samain-de-miedo-en-redondela/": {
+      "title": "Desfile de monstruos, túnel del terror y seres fantásticos para un Samaín de miedo en Redondela",
+      "source": "Metropolitano (Qué Hacer)",
+      "matched_keywords": [
+        "Chapela",
+        "Redondela"
+      ],
+      "first_seen": "2026-10-24T22:20:19.323545",
+      "notified_at": "2026-10-24T22:20:19.323545",
+      "event_date": "Sábado 31 de octubre",
+      "event_date_key": "2026-10-31"
+    },
+    "https://metropolitano.gal/que-hacer/vigo-y-su-area-aprovechan-el-finde-con-una-hora-mas-para-disfrutar-de-magostos-choripan-y-halloween/": {
+      "title": "Vigo y su área aprovechan el finde con una hora más para disfrutar de magostos, choripán y Halloween",
+      "source": "Metropolitano (Qué Hacer)",
+      "matched_keywords": [
+        "Chapela"
+      ],
+      "first_seen": "2026-10-24T22:20:19.323545",
+      "notified_at": "2026-10-24T22:20:19.323545",
+      "event_date": "Viernes 30 de octubre",
+      "event_date_key": "2026-10-30"
+    },
+    "https://metropolitano.gal/que-hacer/charlas-de-superacion-y-talleres-asi-es-el-festival-de-redondela-para-promover-la-inclusion-en-las-escuelas/": {
+      "title": "Charlas de superación y talleres, así es el festival de Redondela para promover la inclusión en las escuelas",
+      "source": "Metropolitano (Qué Hacer)",
+      "matched_keywords": [
+        "Redondela"
+      ],
+      "first_seen": "2026-10-24T22:20:19.323545",
+      "notified_at": "2026-10-24T22:20:19.323545",
+      "event_date": "9 al 13 de noviembre",
+      "event_date_key": "2026-11-13"
+    },
+    "https://metropolitano.gal/que-hacer/una-rastrexo-unico-para-vivir-samain-en-una-isla-de-las-rias-baixas-con-pistas-pruebas-y-queimada/": {
+      "title": "Un rastrexo único para vivir Samaín en una isla de las Rías Baixas con pistas, pruebas y queimada",
+      "source": "Metropolitano (Qué Hacer)",
+      "matched_keywords": [
+        "Chapela"
+      ],
+      "first_seen": "2026-10-24T22:20:19.323545",
+      "notified_at": "2026-10-24T22:20:19.323545",
+      "event_date": "Sábado 31 de octubre",
+      "event_date_key": "2026-10-31"
+    },
+    "https://metropolitano.gal/que-hacer/chapela-da-la-bienvenida-al-frio-con-castanas-choripan-musica-y-un-tunel-del-terror/": {
+      "title": "Chapela da la bienvenida al frío con castañas, choripán, música y un túnel del terror",
+      "source": "Metropolitano (Qué Hacer)",
+      "matched_keywords": [
+        "Chapela"
+      ],
+      "first_seen": "2026-10-24T22:20:19.323545",
+      "notified_at": "2026-10-24T22:20:19.323545",
+      "event_date": "Sábado 24 de octubre",
+      "event_date_key": "2026-10-24"
+    },
+    "https://metropolitano.gal/que-hacer/choripan-actuaciones-y-foliada-en-plena-via-verde-nace-un-magosto-unico-junto-a-vigo/": {
+      "title": "Choripán, actuaciones y foliada en plena Vía Verde, nace un magosto único junto a Vigo",
+      "source": "Metropolitano (Qué Hacer)",
+      "matched_keywords": [
+        "Chapela"
+      ],
+      "first_seen": "2026-10-24T22:20:19.323545",
+      "notified_at": "2026-10-24T22:20:19.323545",
+      "event_date": "Sábado 7 de noviembre",
+      "event_date_key": "2026-11-07"
+    },
+    "https://metropolitano.gal/que-hacer/leticia-sabater-conquista-chapela-con-su-actuacion-y-asegura-que-fue-un-concierto-inolvidable/": {
+      "title": "Leticia Sabater conquista Chapela con su actuación y asegura que fue un \"concierto inolvidable\"",
+      "source": "Metropolitano",
+      "matched_keywords": [
+        "Chapela"
+      ],
+      "first_seen": "2026-10-24T22:20:19.323545",
+      "notified_at": "2026-10-24T22:20:19.323545",
+      "event_date": "Martes 13 de octubre",
+      "event_date_key": "2026-10-13"
+    },
+    "https://metropolitano.gal/que-hacer/pinchos-cachopos-festivales-gratis-y-furanchos-estos-son-los-planes-de-este-puente-en-vigo-y-su-area/": {
+      "title": "Pinchos, cachopos, festivales gratis y furanchos, estos son los planes de este puente en Vigo y su área",
+      "source": "Metropolitano",
+      "matched_keywords": [
+        "Chapela",
+        "Redondela"
+      ],
+      "first_seen": "2026-10-24T22:20:19.323545",
+      "notified_at": "2026-10-24T22:20:19.323545",
+      "event_date": "24 de octubre",
+      "event_date_key": "2026-10-24"
+    },
+    "https://metropolitano.gal/que-hacer/leticia-sabater-aterriza-en-el-area-de-vigo-actuara-gratis-en-redondela-con-su-llamativo-show/": {
+      "title": "Leticia Sabater aterriza en el área de Vigo, actuará gratis en Redondela con su llamativo show",
+      "source": "Metropolitano",
+      "matched_keywords": [
+        "Chapela",
+        "Redondela"
+      ],
+      "first_seen": "2026-10-24T22:20:19.323545",
+      "notified_at": "2026-10-24T22:20:19.323545",
+      "event_date": "Martes 13 de octubre",
+      "event_date_key": "2026-10-13"
+    },
+    "https://metropolitano.gal/que-hacer/leticia-sabater-aterriza-en-una-de-las-fiestas-mas-emblematicas-del-area-de-vigo/": {
+      "title": "Leticia Sabater aterriza en una de las fiestas más emblemáticas del área de Vigo",
+      "source": "Metropolitano",
+      "matched_keywords": [
+        "Chapela"
+      ],
+      "first_seen": "2026-10-24T22:20:19.323545",
+      "notified_at": "2026-10-24T22:20:19.323545",
+      "event_date": "Sábado 10 de octubre",
+      "event_date_key": "2026-10-10"
+    },
+    "https://metropolitano.gal/que-hacer/asi-se-vive-la-conmemoracion-de-la-batalla-de-rande-desde-espectaculo-pirotecnico-a-representaciones/": {
+      "title": "Así se vive la conmemoración de la Batalla de Rande, desde espectáculo pirotécnico a representaciones",
+      "source": "Metropolitano",
+      "matched_keywords": [
+        "Redondela"
+      ],
+      "first_seen": "2026-10-24T22:20:19.323545",
+      "notified_at": "2026-10-24T22:20:19.323545",
+      "event_date": "23 de octubre de 1702",
+      "event_date_key": "2026-10-23"
+    },
+    "https://metropolitano.gal/que-hacer/ultimas-horas-para-disfrutar-de-la-batalla-de-rande-con-mercado-representaciones-y-atracciones/": {
+      "title": "Últimas horas para disfrutar de la Batalla de Rande, con mercado, representaciones y atracciones",
+      "source": "Metropolitano",
+      "matched_keywords": [
+        "Redondela"
+      ],
+      "first_seen": "2026-10-24T22:20:19.323545",
+      "notified_at": "2026-10-24T22:20:19.323545",
+      "event_date": "23 de octubre de 1702",
+      "event_date_key": "2026-10-23"
+    },
+    "https://metropolitano.gal/que-hacer/una-batalla-historica-magostos-callos-verbenas-y-muchos-mas-planes-gratis-en-vigo-y-su-area/": {
+      "title": "Una batalla histórica, magostos, callos, verbenas y muchos más planes gratis en Vigo y su área",
+      "source": "Metropolitano",
+      "matched_keywords": [
+        "Redondela"
+      ],
+      "first_seen": "2026-10-24T22:20:19.323545",
+      "notified_at": "2026-10-24T22:20:19.323545",
+      "event_date": "24 de octubre",
+      "event_date_key": "2026-10-24"
+    },
+    "https://metropolitano.gal/que-hacer/un-local-de-vigo-acogera-una-jornada-muy-especial-con-graffiti-humor-y-comida-por-una-buena-causa/": {
+      "title": "Un local de Vigo acogerá una jornada muy especial con graffiti, humor y comida por una buena causa",
+      "source": "Metropolitano",
+      "matched_keywords": [
+        "Redondela"
+      ],
+      "first_seen": "2026-10-24T22:20:19.323545",
+      "notified_at": "2026-10-24T22:20:19.323545",
+      "event_date": "Sábado 17 de octubre",
+      "event_date_key": "2026-10-17"
+    },
+    "https://metropolitano.gal/que-hacer/redondela-se-llena-risas-durante-meses-con-su-ciclo-de-monologos-mas-divertido/": {
+      "title": "Redondela se llena de risas durante meses con su ciclo de monólogos más divertido",
+      "source": "Metropolitano",
+      "matched_keywords": [
+        "Redondela"
+      ],
+      "first_seen": "2026-10-24T22:20:19.323545",
+      "notified_at": "2026-10-24T22:20:19.323545",
+      "event_date": "20 de diciembre",
+      "event_date_key": "2026-12-20"
+    },
+    "https://metropolitano.gal/que-hacer/la-moda-del-batchcooking-que-arrasa-en-redes-sociales-llega-al-area-de-vigo-con-un-evento-gratuito/": {
+      "title": "La moda del \"batchcooking\" que arrasa en redes sociales llega al área de Vigo con un evento gratuito",
+      "source": "Metropolitano",
+      "matched_keywords": [
+        "Redondela"
+      ],
+      "first_seen": "2026-10-24T22:20:19.323545",
+      "notified_at": "2026-10-24T22:20:19.323545",
+      "event_date": "Miércoles 14 de octubre",
+      "event_date_key": "2026-10-14"
+    },
+    "https://www.vigopeques.com/magosto-o-halloween-en-chapela-no-tienes-que-elegir/": {
+      "title": "¿Magosto o Halloween? En Chapela no tienes que elegir",
+      "source": "VigoPeques",
+      "matched_keywords": [
+        "Chapela"
+      ],
+      "first_seen": "2026-10-24T22:20:19.323545",
+      "notified_at": "2026-10-24T22:20:19.323545",
+      "event_date": "Próximamente",
+      "event_date_key": null
+    },
+    "https://www.vigopeques.com/que-ver-en-la-via-verde-de-chapela-tras-su-ampliacion-ruta-murales-y-consejos/": {
+      "title": "Qué ver en la Vía Verde de Chapela tras su ampliación: ruta, murales y consejos",
+      "source": "VigoPeques",
+      "matched_keywords": [
+        "Chapela"
+      ],
+      "first_seen": "2026-10-24T22:20:19.323545",
+      "notified_at": "2026-10-24T22:20:19.323545",
+      "event_date": "Próximamente",
+      "event_date_key": null
+    },
+    "https://www.vigopeques.com/ceip-plurilingue-igrexa-chapela-un-centro-publico-con-un-proyecto-innovador/": {
+      "title": "CEIP Plurilingüe Igrexa-Chapela: un centro público con un proyecto innovador",
+      "source": "VigoPeques",
+      "matched_keywords": [
+        "Chapela",
+        "Redondela"
+      ],
+      "first_seen": "2026-10-24T22:20:19.323545",
+      "notified_at": "2026-10-24T22:20:19.323545",
+      "event_date": "Próximamente",
+      "event_date_key": null
+    },
+    "https://www.vigopeques.com/redondela-y-chapela-programacion-infantil-navidena/": {
+      "title": "Redondela y Chapela: programación infantil navideña",
+      "source": "VigoPeques",
+      "matched_keywords": [
+        "Chapela",
+        "Redondela"
+      ],
+      "first_seen": "2026-10-24T22:20:19.323545",
+      "notified_at": "2026-10-24T22:20:19.323545",
+      "event_date": "Próximamente",
+      "event_date_key": null
+    },
+    "https://www.vigopeques.com/chapela-celebra-sus-fiestas-con-su-primera-bajada-de-carrilanas/": {
+      "title": "Chapela celebra sus fiestas con su primera bajada de carrilanas",
+      "source": "VigoPeques",
+      "matched_keywords": [
+        "Chapela"
+      ],
+      "first_seen": "2026-10-24T22:20:19.323545",
+      "notified_at": "2026-10-24T22:20:19.323545",
+      "event_date": "Próximamente",
+      "event_date_key": null
+    },
+    "https://www.vigopeques.com/batalla-de-rande-redondela/": {
+      "title": "Redondela celebra la Batalla de Rande",
+      "source": "VigoPeques",
+      "matched_keywords": [
+        "Redondela"
+      ],
+      "first_seen": "2026-10-24T22:20:19.323545",
+      "notified_at": "2026-10-24T22:20:19.323545",
+      "event_date": "23 de octubre",
+      "event_date_key": "2026-10-23"
+    },
+    "https://www.vigopeques.com/carnaval-de-verano-de-redondela/": {
+      "title": "Carnaval de Verano de Redondela 2026: todo lo que necesitas saber",
+      "source": "VigoPeques",
+      "matched_keywords": [
+        "Redondela"
+      ],
+      "first_seen": "2026-10-24T22:20:19.323545",
+      "notified_at": "2026-10-24T22:20:19.323545",
+      "event_date": "Próximamente",
+      "event_date_key": null
+    },
+    "https://www.vigopeques.com/que-hacer-en-redondela-este-verano-planes-gratis-para-toda-la-familia/": {
+      "title": "Qué hacer en Redondela este verano: planes gratis para toda la familia",
+      "source": "VigoPeques",
+      "matched_keywords": [
+        "Redondela"
+      ],
+      "first_seen": "2026-10-24T22:20:19.323545",
+      "notified_at": "2026-10-24T22:20:19.323545",
+      "event_date": "Próximamente",
+      "event_date_key": null
+    },
+    "https://www.vigopeques.com/fiesta-holi-y-fiesta-de-la-espuma-en-redondela-actividades-gratuitas-este-fin-de-semana/": {
+      "title": "Fiesta Holi y Fiesta de la Espuma en Redondela: actividades gratuitas este fin de semana",
+      "source": "VigoPeques",
+      "matched_keywords": [
+        "Redondela"
+      ],
+      "first_seen": "2026-10-24T22:20:19.323545",
+      "notified_at": "2026-10-24T22:20:19.323545",
+      "event_date": "Próximamente",
+      "event_date_key": null
+    },
+    "https://www.vigopeques.com/redondela-reboreda-fervenza/": {
+      "title": "La cascada de Reboreda y sus molinos",
+      "source": "VigoPeques (Redondela)",
+      "event_date": "Thu, 14 ap",
+      "event_date_key": null,
+      "first_seen": "2026-10-24T22:46:01.830742",
+      "notified_at": "2026-10-24T22:46:01.830742"
+    },
+    "https://www.vigopeques.com/samain-en-redondela-con-tunel-del-terror/": {
+      "title": "Samain de Redondela con túnel del terror y talleres infantiles",
+      "source": "VigoPeques",
+      "event_date": "Sat, 24 oc",
+      "event_date_key": null,
+      "first_seen": "2026-10-26T12:32:24.346463",
+      "notified_at": "2026-10-26T12:32:24.346463"
+    },
+    "https://redondela.gal/evento/contos-da-vecinanza-especial-samain/": {
+      "title": "Contos da veciñanza, especial Samaín",
+      "source": "Concello de Redondela (Axenda)",
+      "event_date": "Jueves, 29 de octubre (18:30)",
+      "event_date_key": "2026-10-29",
+      "first_seen": "2026-10-26T12:32:24.346463",
+      "notified_at": "2026-10-26T12:32:24.346463"
+    },
+    "https://redondela.gal/evento/xxi-edicion-do-concurso-de-fotografia-obradoiro-de-estudos-locais-f-m/": {
+      "title": "XXI edición do Concurso de Fotografía «Obradoiro de Estudos Locais F. M»",
+      "source": "Concello de Redondela (Axenda)",
+      "event_date": "Martes, 10 de noviembre",
+      "event_date_key": "2026-11-10",
+      "first_seen": "2026-10-26T12:32:24.346463",
+      "notified_at": "2026-10-26T12:32:24.346463"
+    },
+    "https://redondela.gal/evento/club-de-lectura-de-redondela/2026-11-13/": {
+      "title": "Club de lectura de Redondela",
+      "source": "Concello de Redondela (Axenda)",
+      "event_date": "Viernes, 13 de noviembre (20:00)",
+      "event_date_key": "2026-11-13",
+      "first_seen": "2026-10-26T12:32:24.346463",
+      "notified_at": "2026-10-26T12:32:24.346463"
+    },
+    "https://redondela.gal/evento/club-de-lectura-de-chapela/2026-11-16/": {
+      "title": "Club de lectura de Chapela",
+      "source": "Concello de Redondela (Axenda)",
+      "event_date": "Lunes, 16 de noviembre (20:00)",
+      "event_date_key": "2026-11-16",
+      "first_seen": "2026-10-26T12:32:24.346463",
+      "notified_at": "2026-10-26T12:32:24.346463"
+    },
+    "https://redondela.gal/evento/tropa-creativa-club-infantil-na-biblioteca-xela-arias-de-chapela/2026-11-17/": {
+      "title": "“Tropa Creativa” – Club infantil na Biblioteca Xela Arias de Chapela",
+      "source": "Concello de Redondela (Axenda)",
+      "event_date": "Martes, 17 de noviembre (18:00)",
+      "event_date_key": "2026-11-17",
+      "first_seen": "2026-10-26T12:32:24.346463",
+      "notified_at": "2026-10-26T12:32:24.346463"
+    },
+    "https://redondela.gal/evento/humor-na-sua-tinta-ix-edicion/2026-11-21/": {
+      "title": "HUMOR NA SÚA TINTA – IX Edición",
+      "source": "Concello de Redondela (Axenda)",
+      "event_date": "Sábado, 21 de noviembre (20:30)",
+      "event_date_key": "2026-11-21",
+      "first_seen": "2026-10-26T12:32:24.346463",
+      "notified_at": "2026-10-26T12:32:24.346463"
+    },
+    "https://redondela.gal/evento/club-de-lectura-de-redondela/2026-12-11/": {
+      "title": "Club de lectura de Redondela",
+      "source": "Concello de Redondela (Axenda)",
+      "event_date": "Viernes, 11 de diciembre (20:00)",
+      "event_date_key": "2026-12-11",
+      "first_seen": "2026-10-26T12:32:24.346463",
+      "notified_at": "2026-10-26T12:32:24.346463"
+    },
+    "https://redondela.gal/evento/club-de-lectura-de-chapela/2026-12-14/": {
+      "title": "Club de lectura de Chapela",
+      "source": "Concello de Redondela (Axenda)",
+      "event_date": "Lunes, 14 de diciembre (20:00)",
+      "event_date_key": "2026-12-14",
+      "first_seen": "2026-10-26T12:32:24.346463",
+      "notified_at": "2026-10-26T12:32:24.346463"
+    },
+    "https://redondela.gal/evento/tropa-creativa-club-infantil-na-biblioteca-xela-arias-de-chapela/2026-12-15/": {
+      "title": "“Tropa Creativa” – Club infantil na Biblioteca Xela Arias de Chapela",
+      "source": "Concello de Redondela (Axenda)",
+      "event_date": "Martes, 15 de diciembre (18:00)",
+      "event_date_key": "2026-12-15",
+      "first_seen": "2026-10-26T12:32:24.346463",
+      "notified_at": "2026-10-26T12:32:24.346463"
+    },
+    "https://redondela.gal/evento/humor-na-sua-tinta-ix-edicion/2026-12-20/": {
+      "title": "HUMOR NA SÚA TINTA – IX Edición",
+      "source": "Concello de Redondela (Axenda)",
+      "event_date": "Domingo, 20 de diciembre (18:30)",
+      "event_date_key": "2026-12-20",
+      "first_seen": "2026-10-26T12:32:24.346463",
+      "notified_at": "2026-10-26T12:32:24.346463"
+    },
+    "https://redondela.gal/evento/humor-na-sua-tinta-ix-edicion/2027-01-16/": {
+      "title": "HUMOR NA SÚA TINTA – IX Edición",
+      "source": "Concello de Redondela (Axenda)",
+      "event_date": "Sábado, 16 de enero (19:00)",
+      "event_date_key": "2027-01-16",
+      "first_seen": "2026-10-26T12:32:24.346463",
+      "notified_at": "2026-10-26T12:32:24.346463"
+    },
+    "https://redondela.gal/evento/humor-na-sua-tinta-ix-edicion/2027-02-20/": {
+      "title": "HUMOR NA SÚA TINTA – IX Edición",
+      "source": "Concello de Redondela (Axenda)",
+      "event_date": "Sábado, 20 de febrero (19:00)",
+      "event_date_key": "2027-02-20",
+      "first_seen": "2026-10-26T12:32:24.346463",
+      "notified_at": "2026-10-26T12:32:24.346463"
+    },
+    "https://redondela.gal/evento/humor-na-sua-tinta-ix-edicion/2027-03-07/": {
+      "title": "HUMOR NA SÚA TINTA – IX Edición",
+      "source": "Concello de Redondela (Axenda)",
+      "event_date": "Domingo, 7 de marzo (19:00)",
+      "event_date_key": "2027-03-07",
+      "first_seen": "2026-10-26T12:32:24.346463",
+      "notified_at": "2026-10-26T12:32:24.346463"
+    }
+  }
+}

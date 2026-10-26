@@ -1,19 +1,32 @@
-name: Monitor de Artículos - Chapela y Redondela (Test Manual)
+name: Monitor de Eventos - Chapela y Redondela
 
 on:
+  schedule:
+    # 2 veces al día (hora peninsular española / CET = UTC+1):
+    # 10:15 CET -> 09:15 UTC
+    # 15:35 CET -> 14:35 UTC
+    # (Los minutos :15 y :35 evitan las colas de inicio de hora en GitHub Actions)
+    - cron: '15 9 * * *'
+    - cron: '35 14 * * *'
   workflow_dispatch:
-    # Permite ejecutar manualmente la comprobación para pruebas desde la pestaña Actions en GitHub
+    # Permite ejecutar manualmente la comprobación en cualquier momento desde la pestaña Actions en GitHub
+
+concurrency:
+  group: monitor-scheduled-run
+  cancel-in-progress: false
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  check-articles:
+  check-events:
     runs-on: ubuntu-latest
 
     steps:
       - name: Descargar repositorio
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
       - name: Configurar Python
         uses: actions/setup-python@v5
@@ -21,15 +34,44 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
+      - name: Restaurar suscriptores de la caché
+        uses: actions/cache/restore@v4
+        id: cache-subscribers
+        with:
+          path: suscriptores.json
+          key: subscribers-${{ github.run_id }}
+          restore-keys: |
+            subscribers-
+
       - name: Instalar dependencias
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Ejecutar monitor de noticias (Prueba aislada)
+      - name: Ejecutar monitor de eventos
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SUBSCRIBERS_SEED: ${{ secrets.SUBSCRIBERS_SEED }}
           KEYWORDS: ${{ secrets.KEYWORDS || 'Chapela,Redondela' }}
         run: |
           python monitor.py
+
+      - name: Guardar suscriptores en la caché
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: suscriptores.json
+          key: subscribers-${{ github.run_id }}
+
+      - name: Guardar estado actualizado en el repositorio
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add estado_articulos.json
+          if git diff --staged --quiet; then
+            echo "No hay cambios en el registro de eventos."
+          else
+            git commit -m "chore: actualizar registro de eventos [skip ci]"
+            git push
+          fi
