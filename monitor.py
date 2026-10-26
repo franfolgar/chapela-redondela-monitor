@@ -283,7 +283,13 @@ def extract_event_date(session: requests.Session, url: str, title: str, content:
                 event_date_str = dt_obj.strftime("%d/%m/%Y")
                 dt_key = dt_obj.date()
             except Exception:
-                event_date_str = pub_date[:10]
+                try:
+                    import email.utils
+                    dt_obj = email.utils.parsedate_to_datetime(pub_date)
+                    event_date_str = dt_obj.strftime("%d/%m/%Y")
+                    dt_key = dt_obj.date()
+                except Exception:
+                    event_date_str = pub_date[:10]
         else:
             event_date_str = "Próximamente"
 
@@ -514,7 +520,11 @@ def fetch_redondela_agenda(session: requests.Session) -> List[Dict[str, Any]]:
     url = f"https://redondela.gal/wp-json/tribe/events/v1/events?categories=axenda-completa&per_page=50&start_date={date.today().isoformat()}"
     try:
         logger.info("Consultando Axenda Completa de Concello de Redondela (redondela.gal)...")
-        resp = session.get(url, timeout=20)
+        headers = {
+            "Referer": "https://redondela.gal/agenda/categoria/axenda-completa/",
+            "Accept": "application/json, text/plain, */*",
+        }
+        resp = session.get(url, headers=headers, timeout=20)
         resp.raise_for_status()
         data = resp.json()
         events = data.get("events", [])
@@ -677,6 +687,37 @@ def get_future_events_from_state(state: Dict[str, Any], max_days: int = MAX_FUTU
     return get_sorted_future_events(articles_list, max_days=max_days)
 
 
+def is_past_item(art: Dict[str, Any]) -> bool:
+    """
+    Comprueba si un evento o noticia ya pertenece al pasado y por tanto NO debe
+    notificarse por Telegram como novedad a los suscriptores.
+    """
+    today_iso = date.today().isoformat()
+    ev_key = art.get("event_date_key")
+
+    # 1. Si tiene fecha de evento asignada y es anterior a hoy, es un evento ya pasado
+    if ev_key and ev_key < today_iso:
+        return True
+
+    # 2. Si no tiene event_date_key pero tiene fecha de publicación en metadatos
+    pub_date_str = art.get("date", "")
+    if pub_date_str:
+        pub_dt = None
+        try:
+            pub_dt = datetime.fromisoformat(pub_date_str.replace("Z", "+00:00")).date()
+        except Exception:
+            try:
+                import email.utils
+                pub_dt = email.utils.parsedate_to_datetime(pub_date_str).date()
+            except Exception:
+                pass
+        # Si fue publicado hace más de 7 días, es una noticia pasada, no un aviso nuevo
+        if pub_dt and pub_dt < (date.today() - timedelta(days=7)):
+            return True
+
+    return False
+
+
 # ==============================================================================
 # GESTIÓN DE SUSCRIPTORES Y PERSISTENCIA
 # ==============================================================================
@@ -762,27 +803,16 @@ def load_previous_state(filepath: Path) -> Dict[str, Any]:
 
 
 def save_current_state(filepath: Path, state: Dict[str, Any]) -> None:
-    """Guarda atómicamente el estado actual en disco purgando artículos con más de 60 días de antigüedad."""
+    """Guarda atómicamente el estado actual en disco preservando el historial para no duplicar alertas."""
     with DATA_LOCK:
-        # Purgar artículos antiguos para evitar crecimiento ilimitado
-        cutoff_date = (date.today() - timedelta(days=60)).isoformat()
         articulos = state.get("articulos", {})
-        pruned_articulos = {}
-        for url, item in articulos.items():
-            ev_key = item.get("event_date_key")
-            first_seen = (item.get("first_seen") or "")[:10]
-            ref_date = ev_key or first_seen
-            if not ref_date or ref_date >= cutoff_date:
-                pruned_articulos[url] = item
-
-        state["articulos"] = pruned_articulos
-        state["total_registrados"] = len(pruned_articulos)
+        state["total_registrados"] = len(articulos)
 
         temp_file = filepath.parent / f"{filepath.name}.tmp"
         with open(temp_file, "w", encoding="utf-8") as f:
             json.dump(state, f, ensure_ascii=False, indent=2)
         temp_file.replace(filepath)
-        logger.info(f"Estado actualizado en {filepath} con {len(pruned_articulos)} registros (purgados anteriores a {cutoff_date}).")
+        logger.info(f"Estado actualizado en {filepath} con {len(articulos)} registros guardados.")
 
 
 # ==============================================================================
@@ -1215,6 +1245,17 @@ def run(force_future_summary: bool = False):
     for art in current_matches:
         url = art["url"]
         if url not in cleaned_saved_articles:
+            if is_past_item(art):
+                logger.info(f"Omitiendo notificación de evento o noticia pasada ({art.get('event_date_key') or art.get('date')}): {art['title']}")
+                cleaned_saved_articles[url] = {
+                    "title": art["title"],
+                    "source": art["source"],
+                    "event_date": art.get("event_date", ""),
+                    "event_date_key": art.get("event_date_key"),
+                    "first_seen": now_iso,
+                    "notified_at": None,
+                }
+                continue
             new_articles.append(art)
 
     logger.info(f"Nuevos eventos/planes encontrados: {len(new_articles)}")

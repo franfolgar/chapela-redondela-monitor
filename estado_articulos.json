@@ -1,7 +1,7 @@
 {
   "created_at": "2026-10-24T22:20:19.323545",
-  "last_check": "2026-10-26T18:26:11.132269",
-  "total_registrados": 43,
+  "last_check": "2026-10-26T19:51:31.194682",
+  "total_registrados": 46,
   "articulos": {
     "https://metropolitano.gal/agenda/magosto-y-tunel-del-terror-en-chapela/": {
       "title": "Magosto y Túnel del terror en Chapela",
@@ -435,6 +435,30 @@
       "event_date_key": "2027-03-07",
       "first_seen": "2026-10-26T12:32:24.346463",
       "notified_at": "2026-10-26T12:32:24.346463"
+    },
+    "https://metropolitano.gal/agenda/entroido-de-veran-de-redondela/": {
+      "title": "Entroido de Verán de Redondela",
+      "source": "Metropolitano (Agenda)",
+      "event_date": "Sábado, 22 de agosto 6:00pm",
+      "event_date_key": "2026-08-22",
+      "first_seen": "2026-10-26T19:51:16.404096",
+      "notified_at": null
+    },
+    "https://metropolitano.gal/agenda/festa-do-mexillon-de-chapela/": {
+      "title": "Festa do Mexillón de Chapela",
+      "source": "Metropolitano (Agenda)",
+      "event_date": "Sábado, 8 de agosto 12:00pm",
+      "event_date_key": "2026-08-08",
+      "first_seen": "2026-10-26T19:51:16.404096",
+      "notified_at": null
+    },
+    "https://www.vigopeques.com/festival-de-artistas-de-rua-de-redondela/": {
+      "title": "Festival de artistas de Rúa y Shopping Night 2026 en Redondela",
+      "source": "VigoPeques",
+      "event_date": "Viernes 31 de julio",
+      "event_date_key": "2026-07-31",
+      "first_seen": "2026-10-26T19:51:16.404096",
+      "notified_at": null
     }
   }
 }
