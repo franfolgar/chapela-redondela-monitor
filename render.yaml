@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: chapela-redondela-bot
+    runtime: python
+    plan: free
+    region: frankfurt
+    buildCommand: pip install -r requirements.txt
+    startCommand: python monitor.py --server
+    envVars:
+      - key: TELEGRAM_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
+      - key: KEYWORDS
+        value: Chapela,Redondela
+      - key: PYTHON_VERSION
+        value: 3.11.8

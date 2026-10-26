@@ -23,10 +23,12 @@ import logging
 import re
 import html
 import time
+import threading
 from pathlib import Path
 from datetime import datetime, date, timedelta
 from typing import Dict, List, Set, Any, Optional, Tuple
 from urllib.parse import urlparse, urlunparse
+from http.server import HTTPServer, ThreadingHTTPServer, BaseHTTPRequestHandler
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -857,8 +859,119 @@ def format_article_message(article: Dict[str, Any]) -> str:
 
 
 # ==============================================================================
-# GESTIÓN DE ACTUALIZACIONES TELEGRAM (NUEVOS USUARIOS /START)
+# GESTIÓN DE ACTUALIZACIONES TELEGRAM (NUEVOS USUARIOS /START Y COMANDOS)
 # ==============================================================================
+
+def configure_telegram_webhook(base_url: str) -> bool:
+    """Configura el webhook de Telegram apuntando a la URL pública de Render."""
+    if not TELEGRAM_TOKEN or not base_url:
+        return False
+    webhook_url = f"{base_url.rstrip('/')}/webhook"
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/setWebhook"
+    try:
+        resp = requests.post(url, json={"url": webhook_url}, timeout=15)
+        data = resp.json()
+        if data.get("ok"):
+            logger.info(f"Webhook de Telegram configurado con éxito hacia: {webhook_url}")
+            return True
+        else:
+            logger.error(f"Fallo al configurar webhook en Telegram: {data}")
+            return False
+    except Exception as e:
+        logger.error(f"Error llamando a setWebhook: {e}")
+        return False
+
+
+def delete_telegram_webhook() -> bool:
+    """Elimina el webhook de Telegram para permitir getUpdates / long polling sin conflictos."""
+    if not TELEGRAM_TOKEN:
+        return False
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/deleteWebhook"
+    try:
+        resp = requests.post(url, timeout=10)
+        return resp.json().get("ok", False)
+    except Exception:
+        return False
+
+
+def handle_single_update(
+    up: Dict[str, Any],
+    future_events: List[Dict[str, Any]],
+    subscribers: Optional[Dict[str, Any]] = None
+) -> bool:
+    """
+    Procesa una actualización individual de Telegram (/start, /eventos, /ayuda, etc.).
+    Devuelve True si se registró o modificó algún suscriptor.
+    """
+    msg = up.get("message") or up.get("my_chat_member")
+    if not msg:
+        return False
+
+    chat = msg.get("chat", {})
+    cid = str(chat.get("id", ""))
+    from_user = msg.get("from", {})
+    first_name = from_user.get("first_name", "")
+    username = from_user.get("username", "")
+    text = (msg.get("text") or "").strip().lower()
+
+    if not cid:
+        return False
+
+    save_immediately = False
+    if subscribers is None:
+        subscribers = load_subscribers()
+        save_immediately = True
+
+    is_new_user = cid not in subscribers
+    is_start_cmd = text.startswith("/start")
+    is_events_cmd = text.startswith("/eventos") or text.startswith("/agenda") or text.startswith("/cartelera")
+    is_help_cmd = text.startswith("/ayuda") or text.startswith("/help")
+
+    user_changed = False
+
+    if is_new_user:
+        logger.info(f"Nuevo suscriptor detectado: {first_name} (@{username}) [ID: {cid}]")
+        subscribers[cid] = {
+            "first_name": first_name,
+            "username": username,
+            "subscribed_at": datetime.now().isoformat(),
+            "last_interaction": datetime.now().isoformat(),
+        }
+        user_changed = True
+        welcome_msg = build_welcome_message(first_name, future_events)
+        send_telegram_message(cid, welcome_msg)
+
+    elif is_events_cmd:
+        logger.info(f"Comando de eventos de {first_name} [ID: {cid}]")
+        subscribers[cid]["last_interaction"] = datetime.now().isoformat()
+        user_changed = True
+        summary_msg = build_events_summary_message(first_name, future_events)
+        send_telegram_message(cid, summary_msg)
+
+    elif is_start_cmd:
+        logger.info(f"Comando /start de suscriptor existente: {first_name} [ID: {cid}]")
+        subscribers[cid]["last_interaction"] = datetime.now().isoformat()
+        user_changed = True
+        welcome_msg = build_welcome_message(first_name, future_events)
+        send_telegram_message(cid, welcome_msg)
+
+    elif is_help_cmd:
+        logger.info(f"Comando de ayuda de {first_name} [ID: {cid}]")
+        help_msg = (
+            "ℹ️ <b>BOT DE EVENTOS DE CHAPELA Y REDONDELA</b> 📍\n\n"
+            "Comandos disponibles:\n"
+            "• /eventos - Cartelera de las próximas semanas.\n"
+            "• /start - Mensaje de bienvenida e información inicial.\n"
+            "• /ayuda - Muestra esta ayuda.\n\n"
+            "<i>Recibirás un aviso automático en cuanto se detecte cualquier nuevo evento en Chapela o Redondela.</i>"
+        )
+        send_telegram_message(cid, help_msg)
+
+    if user_changed and save_immediately:
+        save_subscribers(subscribers)
+
+    return user_changed
+
 
 def process_telegram_updates(future_events: List[Dict[str, Any]], poll_timeout: int = 0) -> None:
     """
@@ -896,67 +1009,8 @@ def process_telegram_updates(future_events: List[Dict[str, Any]], poll_timeout: 
             if up_id is not None:
                 max_update_id = up_id if max_update_id is None else max(max_update_id, up_id)
 
-            msg = up.get("message") or up.get("my_chat_member")
-            if not msg:
-                continue
-
-            chat = msg.get("chat", {})
-            cid = str(chat.get("id", ""))
-            from_user = msg.get("from", {})
-            first_name = from_user.get("first_name", "")
-            username = from_user.get("username", "")
-            text = (msg.get("text") or "").strip().lower()
-
-            if not cid:
-                continue
-
-            is_new_user = cid not in subscribers
-            is_start_cmd = text.startswith("/start")
-            is_events_cmd = text.startswith("/eventos") or text.startswith("/agenda") or text.startswith("/cartelera")
-            is_help_cmd = text.startswith("/ayuda") or text.startswith("/help")
-
-            if is_new_user:
-                logger.info(f"Nuevo suscriptor detectado: {first_name} (@{username}) [ID: {cid}]")
-                subscribers[cid] = {
-                    "first_name": first_name,
-                    "username": username,
-                    "subscribed_at": datetime.now().isoformat(),
-                    "last_interaction": datetime.now().isoformat(),
-                }
+            if handle_single_update(up, future_events, subscribers):
                 new_users_added = True
-
-                # Enviar bienvenida personalizada con cartelera de próximos eventos
-                welcome_msg = build_welcome_message(first_name, future_events)
-                send_telegram_message(cid, welcome_msg)
-
-            elif is_events_cmd:
-                # Consulta de cartelera por usuario existente
-                logger.info(f"Comando de eventos de {first_name} [ID: {cid}]")
-                subscribers[cid]["last_interaction"] = datetime.now().isoformat()
-                new_users_added = True
-                summary_msg = build_events_summary_message(first_name, future_events)
-                send_telegram_message(cid, summary_msg)
-
-            elif is_start_cmd:
-                # Reinicio /start de usuario existente
-                logger.info(f"Comando /start de suscriptor existente: {first_name} [ID: {cid}]")
-                subscribers[cid]["last_interaction"] = datetime.now().isoformat()
-                new_users_added = True
-                welcome_msg = build_welcome_message(first_name, future_events)
-                send_telegram_message(cid, welcome_msg)
-
-            elif is_help_cmd:
-                # Comando de ayuda
-                logger.info(f"Comando de ayuda de {first_name} [ID: {cid}]")
-                help_msg = (
-                    "ℹ️ <b>BOT DE EVENTOS DE CHAPELA Y REDONDELA</b> 📍\n\n"
-                    "Comandos disponibles:\n"
-                    "• /eventos - Cartelera de las próximas semanas.\n"
-                    "• /start - Mensaje de bienvenida e información inicial.\n"
-                    "• /ayuda - Muestra esta ayuda.\n\n"
-                    "<i>Recibirás un aviso automático en cuanto se detecte cualquier nuevo evento en Chapela o Redondela.</i>"
-                )
-                send_telegram_message(cid, help_msg)
 
         if new_users_added:
             save_subscribers(subscribers)
@@ -966,6 +1020,7 @@ def process_telegram_updates(future_events: List[Dict[str, Any]], poll_timeout: 
             requests.get(f"{url}?offset={max_update_id + 1}&limit=1", timeout=10)
 
     except Exception as e:
+        logger.error(f"Error procesando actualizaciones de Telegram: {e}")
         logger.error(f"Error procesando actualizaciones de Telegram: {e}")
 
 
@@ -1085,7 +1140,108 @@ def run(force_future_summary: bool = False):
 
 
 # ==============================================================================
-# MODO ESCUCHA EN TIEMPO REAL (DAEMON / POLLING)
+# SERVIDOR WEB Y WEBHOOK PARA RENDER (24/7)
+# ==============================================================================
+
+class TelegramWebhookHandler(BaseHTTPRequestHandler):
+    def log_message(self, format, *args):
+        # Silenciar logs ruidosos de comprobaciones automáticas /health
+        if len(args) > 0 and ("GET / " in str(args[0]) or "GET /health" in str(args[0])):
+            return
+        logger.info("%s - - [%s] %s" % (self.client_address[0], self.log_date_time_string(), format % args))
+
+    def do_GET(self):
+        if self.path in ("/", "/health", "/ping"):
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.end_headers()
+            previous_state = load_previous_state(DATA_FILE)
+            subscribers = load_subscribers()
+            resp = {
+                "status": "healthy",
+                "service": "Chapela y Redondela Event Monitor Bot",
+                "total_articulos": len(previous_state.get("articulos", {})),
+                "total_suscriptores": len(subscribers),
+                "timestamp": datetime.now().isoformat(),
+            }
+            self.wfile.write(json.dumps(resp, ensure_ascii=False).encode("utf-8"))
+        elif self.path == "/refresh":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(b"Ejecutando escaneo manual de eventos en segundo plano...\n")
+            threading.Thread(target=run, kwargs={"force_future_summary": False}, daemon=True).start()
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+    def do_POST(self):
+        if self.path in ("/webhook", f"/webhook/{TELEGRAM_TOKEN}"):
+            try:
+                content_length = int(self.headers.get("Content-Length", 0))
+                body = self.rfile.read(content_length).decode("utf-8")
+                if body:
+                    update = json.loads(body)
+                    previous_state = load_previous_state(DATA_FILE)
+                    future_events = get_future_events_from_state(previous_state)
+                    handle_single_update(update, future_events)
+            except Exception as e:
+                logger.error(f"Error procesando webhook entrante de Telegram: {e}")
+
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"OK")
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+
+def run_web_server(port: int = 10000):
+    """
+    Servidor web para Render (Web Service 24/7):
+    - Escucha en el puerto asignado por Render ($PORT).
+    - GET /: Healthcheck para Render y monitores de disponibilidad.
+    - POST /webhook: Respuesta instantánea a /eventos, /start, etc.
+    - Hilo secundario: Comprueba nuevos eventos cada 30 minutos.
+    """
+    logger.info("=================================================================")
+    logger.info(f"Iniciando Servidor Web para Render en puerto {port}")
+    logger.info("=================================================================")
+
+    # Si estamos en Render, configurar el webhook automáticamente
+    external_url = os.getenv("RENDER_EXTERNAL_URL") or os.getenv("WEBHOOK_URL")
+    if external_url:
+        configure_telegram_webhook(external_url)
+    else:
+        logger.info("RENDER_EXTERNAL_URL no configurado aún (normal en arranque local o primer despliegue).")
+
+    # Hilo secundario: Scraper automático cada 30 minutos
+    def periodic_scraper():
+        logger.info("Hilo secundario de scraping activado (revisión periódica cada 30 min).")
+        while True:
+            try:
+                time.sleep(1800)
+                logger.info("Ejecutando ciclo periódico de comprobación de eventos desde Render...")
+                run(force_future_summary=False)
+            except Exception as e:
+                logger.error(f"Error en ciclo periódico de scraping: {e}")
+
+    scraper_thread = threading.Thread(target=periodic_scraper, daemon=True)
+    scraper_thread.start()
+
+    server = ThreadingHTTPServer(("0.0.0.0", port), TelegramWebhookHandler)
+    logger.info(f"Servidor HTTP activo en http://0.0.0.0:{port}")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        logger.info("Servidor detenido por el usuario.")
+    finally:
+        server.server_close()
+
+
+# ==============================================================================
+# MODO ESCUCHA EN TIEMPO REAL (DAEMON / POLLING LOCAL)
 # ==============================================================================
 
 def run_listener_loop():
@@ -1094,6 +1250,7 @@ def run_listener_loop():
     Permite responder a /start, /eventos y comandos en menos de 0.5 segundos de forma continua.
     """
     logger.info("Iniciando bucle de escucha en tiempo real de Telegram (long-polling)...")
+    delete_telegram_webhook()
     previous_state = load_previous_state(DATA_FILE)
     future_events = get_future_events_from_state(previous_state)
     last_scrape = 0.0
@@ -1117,7 +1274,10 @@ def run_listener_loop():
 
 
 if __name__ == "__main__":
-    if "--listen" in sys.argv or "--daemon" in sys.argv:
+    if "--server" in sys.argv or "--web" in sys.argv or os.getenv("RENDER"):
+        port = int(os.getenv("PORT", 10000))
+        run_web_server(port)
+    elif "--listen" in sys.argv or "--daemon" in sys.argv:
         run_listener_loop()
     else:
         send_summary = "--send-future" in sys.argv
