@@ -1295,6 +1295,16 @@ class TelegramWebhookHandler(BaseHTTPRequestHandler):
                     update = json.loads(body)
                     previous_state = load_previous_state(DATA_FILE)
                     future_events = get_future_events_from_state(previous_state)
+
+                    # Salvaguarda: si por reinicio de contenedor el archivo aún no tiene eventos,
+                    # hacer escaneo de rescate inmediato para no devolver cartelera vacía
+                    if not future_events:
+                        logger.info("Cartelera vacía en petición de Telegram; ejecutando escaneo de rescate...")
+                        current_matches = get_all_matched_articles(known_articles=previous_state.get("articulos", {}))
+                        future_events = get_sorted_future_events(current_matches)
+                        if current_matches:
+                            threading.Thread(target=run, kwargs={"force_future_summary": False}, daemon=True).start()
+
                     handle_single_update(update, future_events)
             except Exception as e:
                 logger.error(f"Error procesando webhook entrante de Telegram: {e}")
@@ -1327,14 +1337,18 @@ def run_web_server(port: int = 10000):
     else:
         logger.info("RENDER_EXTERNAL_URL no configurado aún (normal en arranque local o primer despliegue).")
 
-    # Hilo secundario: Scraper automático (ejecuta un pase inicial de inmediato y luego cada 30 min)
-    def periodic_scraper():
-        logger.info("Hilo secundario de scraping activado. Ejecutando escaneo inicial de eventos...")
+    # Si la base de eventos está vacía, ejecutar escaneo síncrono para tener la cartelera lista de inmediato
+    previous_state = load_previous_state(DATA_FILE)
+    if not previous_state.get("articulos"):
+        logger.info("Base de eventos vacía al arrancar. Ejecutando escaneo inicial de artículos...")
         try:
             run(force_future_summary=False)
         except Exception as e:
-            logger.error(f"Error en escaneo inicial de arranque: {e}")
+            logger.error(f"Error en escaneo inicial síncrono: {e}")
 
+    # Hilo secundario: Scraper automático cada 30 minutos
+    def periodic_scraper():
+        logger.info("Hilo secundario de scraping activado (revisión periódica cada 30 min).")
         while True:
             try:
                 time.sleep(1800)
