@@ -1,7 +1,7 @@
 {
   "created_at": "2026-10-24T22:20:19.323545",
-  "last_check": "2026-10-27T07:42:53.208409",
-  "total_registrados": 46,
+  "last_check": "2026-10-27T21:15:39.360045",
+  "total_registrados": 47,
   "articulos": {
     "https://metropolitano.gal/agenda/magosto-y-tunel-del-terror-en-chapela/": {
       "title": "Magosto y Túnel del terror en Chapela",
@@ -459,6 +459,14 @@
       "event_date_key": "2026-07-31",
       "first_seen": "2026-10-26T19:51:16.404096",
       "notified_at": null
+    },
+    "https://metropolitano.gal/que-hacer/redondela-programa-varias-actividades-para-recordar-a-las-victimas-de-la-guerra-civil-y-la-dictadura/": {
+      "title": "Redondela programa varias actividades para recordar a las víctimas de la Guerra Civil y la dictadura",
+      "source": "Metropolitano (Qué Hacer)",
+      "event_date": "31 de octubre",
+      "event_date_key": "2026-10-31",
+      "first_seen": "2026-10-27T21:15:39.360045",
+      "notified_at": "2026-10-27T21:15:39.360045"
     }
   }
 }
