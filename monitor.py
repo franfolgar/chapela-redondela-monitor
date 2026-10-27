@@ -1289,17 +1289,29 @@ def run(force_future_summary: bool = False):
         save_current_state(DATA_FILE, previous_state)
         logger.info(f"Se han notificado {len(new_articles)} eventos nuevos a todos los suscriptores.")
     else:
-        for art in current_matches:
-            url = art["url"]
-            if url in cleaned_saved_articles:
-                cleaned_saved_articles[url]["event_date"] = art.get("event_date", "")
-                cleaned_saved_articles[url]["event_date_key"] = art.get("event_date_key")
+        changed = False
+        # Si se agregaron artículos archivados (ej. pasados) no registrados previamente
+        if len(cleaned_saved_articles) != len(previous_state.get("articulos", {})):
+            changed = True
+        else:
+            for art in current_matches:
+                url = art["url"]
+                if url in cleaned_saved_articles:
+                    old_date = cleaned_saved_articles[url].get("event_date", "")
+                    new_date = art.get("event_date", "")
+                    if old_date != new_date:
+                        cleaned_saved_articles[url]["event_date"] = new_date
+                        cleaned_saved_articles[url]["event_date_key"] = art.get("event_date_key")
+                        changed = True
 
-        previous_state["last_check"] = now_iso
-        previous_state["total_registrados"] = len(cleaned_saved_articles)
-        previous_state["articulos"] = cleaned_saved_articles
-        save_current_state(DATA_FILE, previous_state)
-        logger.info("No hay nuevos eventos publicados. Todo al día.")
+        if changed:
+            previous_state["last_check"] = now_iso
+            previous_state["total_registrados"] = len(cleaned_saved_articles)
+            previous_state["articulos"] = cleaned_saved_articles
+            save_current_state(DATA_FILE, previous_state)
+            logger.info("Estado actualizado con cambios en eventos existentes.")
+        else:
+            logger.info("No hay nuevos eventos ni modificaciones en las fechas. Todo al día.")
 
 
 # ==============================================================================

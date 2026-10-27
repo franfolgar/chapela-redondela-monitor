@@ -75,10 +75,11 @@ run_monitor.bat
 
 ## ⏰ Modos de Ejecución
 
-### Opción 1 (Recomendada): Automatización Programada Cada Hora en GitHub Actions (100% Gratis, 0 Horas de Servidor)
+### Opción 1 (Recomendada): Automatización Programada Cada 15 Minutos en GitHub Actions (100% Gratis, 0 Horas de Servidor)
 
-El bot está configurado para ejecutarse automáticamente mediante **GitHub Actions** **cada hora**:
-- **Frecuencia**: Cada hora a los minutos `:15` (ej. 10:15, 11:15, 12:15...).
+El bot está configurado para ejecutarse automáticamente mediante **GitHub Actions** **cada 15 minutos**:
+- **Frecuencia**: Cada 15 minutos (`*/15 * * * *`: :00, :15, :30, :45).
+- **Respuesta a comandos**: Los usuarios que escriban `/eventos` o pulsen `/start` recibirán la respuesta en un plazo máximo de 15 minutos.
 - **Filtro temporal estricto**: Solo emite alertas por Telegram si el evento tendrá lugar en los **próximos 60 días (2 meses)** o si es una noticia general de última hora (publicada en los últimos 7 días). Cualquier evento pasado o posterior a 60 días se descarta automáticamente.
 
 **Ventajas clave:**
