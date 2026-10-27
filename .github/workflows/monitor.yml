@@ -2,10 +2,13 @@ name: Monitor de Eventos - Chapela y Redondela
 
 on:
   schedule:
-    # Ejecución automática cada 15 minutos (4 veces por hora: :00, :15, :30, :45)
+    # Programador interno de GitHub (respaldo automático cada 15 min)
     - cron: '*/15 * * * *'
   workflow_dispatch:
     # Permite ejecutar manualmente la comprobación en cualquier momento desde la pestaña Actions en GitHub
+  repository_dispatch:
+    # Permite disparar la comprobación desde un cron externo (ej. cron-job.org) con puntualidad al segundo
+    types: [check-events, cron]
 
 concurrency:
   group: monitor-scheduled-run
