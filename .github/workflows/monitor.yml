@@ -2,12 +2,8 @@ name: Monitor de Eventos - Chapela y Redondela
 
 on:
   schedule:
-    # 2 veces al día (hora peninsular española / CET = UTC+1):
-    # 10:15 CET -> 09:15 UTC
-    # 15:35 CET -> 14:35 UTC
-    # (Los minutos :15 y :35 evitan las colas de inicio de hora en GitHub Actions)
-    - cron: '15 9 * * *'
-    - cron: '35 14 * * *'
+    # Ejecución automática cada hora (a los 15 minutos de cada hora para evitar colas en los runners)
+    - cron: '15 * * * *'
   workflow_dispatch:
     # Permite ejecutar manualmente la comprobación en cualquier momento desde la pestaña Actions en GitHub
 

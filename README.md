@@ -75,14 +75,15 @@ run_monitor.bat
 
 ## ⏰ Modos de Ejecución
 
-### Opción 1 (Recomendada): Automatización Programada 2 Veces al Día en GitHub Actions (100% Gratis, 0 Horas de Servidor)
+### Opción 1 (Recomendada): Automatización Programada Cada Hora en GitHub Actions (100% Gratis, 0 Horas de Servidor)
 
-El bot está configurado para ejecutarse automáticamente mediante **GitHub Actions** dos veces al día:
-- **Mañana**: ~10:15 CET (hora peninsular española).
-- **Tarde**: ~15:35 CET (hora peninsular española).
+El bot está configurado para ejecutarse automáticamente mediante **GitHub Actions** **cada hora**:
+- **Frecuencia**: Cada hora a los minutos `:15` (ej. 10:15, 11:15, 12:15...).
+- **Filtro temporal estricto**: Solo emite alertas por Telegram si el evento tendrá lugar en los **próximos 60 días (2 meses)** o si es una noticia general de última hora (publicada en los últimos 7 días). Cualquier evento pasado o posterior a 60 días se descarta automáticamente.
 
 **Ventajas clave:**
 - **0 horas de Render consumidas**: No gasta la cuota mensual de 750 horas de Render, dejándola disponible para otros proyectos.
+- **Ilimitado en repositorios públicos**: GitHub Actions ofrece minutos ilimitados para repositorios públicos, por lo que ejecutarlo 24 veces al día tiene coste cero.
 - **Persistencia en Git**: Actualiza automáticamente `estado_articulos.json` en el repositorio para no duplicar nunca alertas.
 - **Suscriptores seguros**: Mantiene la lista de suscriptores privada mediante `SUBSCRIBERS_SEED` en GitHub Secrets y la caché segura de GitHub Actions, sin exponer datos personales en commits públicos.
 - **Ejecución manual**: Puedes lanzar una comprobación cuando quieras desde la pestaña **Actions** en GitHub pulsando en *Run workflow*.

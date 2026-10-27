@@ -687,19 +687,27 @@ def get_future_events_from_state(state: Dict[str, Any], max_days: int = MAX_FUTU
     return get_sorted_future_events(articles_list, max_days=max_days)
 
 
-def is_past_item(art: Dict[str, Any]) -> bool:
+def should_notify_article(art: Dict[str, Any]) -> Tuple[bool, str]:
     """
-    Comprueba si un evento o noticia ya pertenece al pasado y por tanto NO debe
-    notificarse por Telegram como novedad a los suscriptores.
+    Determina si un artículo nuevo debe enviar notificación a los suscriptores.
+    Requisitos:
+    - Si es un evento con fecha: debe ocurrir en los próximos 60 días (2 meses) y no haber pasado ya.
+    - Si es una noticia sin fecha de evento: debe haberse publicado recientemente (últimos 7 días).
+    Devuelve (True, "motivo") o (False, "motivo").
     """
-    today_iso = date.today().isoformat()
+    today = date.today()
+    today_iso = today.isoformat()
+    limit_future_iso = (today + timedelta(days=MAX_FUTURE_DAYS)).isoformat()
     ev_key = art.get("event_date_key")
 
-    # 1. Si tiene fecha de evento asignada y es anterior a hoy, es un evento ya pasado
-    if ev_key and ev_key < today_iso:
-        return True
+    if ev_key:
+        if ev_key < today_iso:
+            return False, f"evento pasado ({ev_key})"
+        if ev_key > limit_future_iso:
+            return False, f"evento posterior a la ventana de {MAX_FUTURE_DAYS} días ({ev_key})"
+        return True, f"evento futuro confirmado para los próximos {MAX_FUTURE_DAYS} días ({ev_key})"
 
-    # 2. Si no tiene event_date_key pero tiene fecha de publicación en metadatos
+    # Si no tiene fecha de evento explícita, revisar fecha de publicación del artículo
     pub_date_str = art.get("date", "")
     if pub_date_str:
         pub_dt = None
@@ -711,11 +719,11 @@ def is_past_item(art: Dict[str, Any]) -> bool:
                 pub_dt = email.utils.parsedate_to_datetime(pub_date_str).date()
             except Exception:
                 pass
-        # Si fue publicado hace más de 7 días, es una noticia pasada, no un aviso nuevo
-        if pub_dt and pub_dt < (date.today() - timedelta(days=7)):
-            return True
+        if pub_dt:
+            if pub_dt < (today - timedelta(days=7)):
+                return False, f"noticia publicada hace más de 7 días ({pub_dt.isoformat()})"
 
-    return False
+    return True, "noticia o plan reciente"
 
 
 # ==============================================================================
@@ -1245,8 +1253,9 @@ def run(force_future_summary: bool = False):
     for art in current_matches:
         url = art["url"]
         if url not in cleaned_saved_articles:
-            if is_past_item(art):
-                logger.info(f"Omitiendo notificación de evento o noticia pasada ({art.get('event_date_key') or art.get('date')}): {art['title']}")
+            should_notify, reason = should_notify_article(art)
+            if not should_notify:
+                logger.info(f"Omitiendo alerta de {art['title']}: {reason}")
                 cleaned_saved_articles[url] = {
                     "title": art["title"],
                     "source": art["source"],
