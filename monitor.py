@@ -25,6 +25,7 @@ import html
 import time
 import threading
 import hashlib
+import unicodedata
 from pathlib import Path
 from datetime import datetime, date, timedelta
 from typing import Dict, List, Set, Any, Optional, Tuple
@@ -734,6 +735,54 @@ def get_all_matched_articles(known_articles: Optional[Dict[str, Any]] = None) ->
     return matched_articles
 
 
+# Palabras sin valor para distinguir eventos al comparar títulos (castellano y gallego)
+TITLE_STOPWORDS = set("""
+de del la el los las y e o a un una unos unas con al se su sus que es este esta estos estas en por para como mas muy
+da do das dos na no nas nos cun coa coas cos unha uns unhas pola polo polas polos ao aos sobre entre desde hasta tras ya
+asi vive gran nuevo nueva fin semana planes plan gratis todo todos toda todas lo le les sin hay edicion area vigo
+""".split())
+
+
+def normalize_words(text: str) -> Set[str]:
+    """Palabras significativas (minúsculas, sin tildes, 4+ letras, sin palabras vacías) de un texto."""
+    text = unicodedata.normalize("NFKD", text.lower())
+    text = "".join(c for c in text if not unicodedata.combining(c))
+    return {w for w in re.findall(r"[a-z0-9]+", text) if len(w) >= 4 and w not in TITLE_STOPWORDS}
+
+
+def is_same_event(a: Dict[str, Any], b: Dict[str, Any]) -> bool:
+    """
+    Decide si dos artículos de fuentes distintas hablan del mismo evento:
+    misma fecha de evento y al menos 2 palabras significativas comunes que supongan
+    la mitad o más del título más corto. Si cada título nombra un lugar distinto
+    (Chapela frente a Redondela) se consideran eventos diferentes.
+    """
+    date_key = a.get("event_date_key")
+    if not date_key or date_key != b.get("event_date_key"):
+        return False
+
+    places_a = set(extract_matched_keywords(a.get("title", ""), KEYWORDS))
+    places_b = set(extract_matched_keywords(b.get("title", ""), KEYWORDS))
+    if places_a and places_b and not (places_a & places_b):
+        return False
+
+    keyword_words = normalize_words(" ".join(KEYWORDS))
+    words_a = normalize_words(a.get("title", "")) - keyword_words
+    words_b = normalize_words(b.get("title", "")) - keyword_words
+    if not words_a or not words_b:
+        return False
+    common = words_a & words_b
+    return len(common) >= 2 and len(common) / min(len(words_a), len(words_b)) >= 0.5
+
+
+def find_same_event(art: Dict[str, Any], known: Dict[str, Dict[str, Any]]) -> Optional[str]:
+    """Devuelve la URL de un artículo ya conocido que trate el mismo evento, o None."""
+    for url, other in known.items():
+        if url != art.get("url") and is_same_event(art, other):
+            return url
+    return None
+
+
 def get_sorted_future_events(articles: List[Dict[str, Any]], max_days: int = MAX_FUTURE_DAYS) -> List[Dict[str, Any]]:
     """Filtra y ordena cronológicamente los eventos futuros dentro de la ventana de días configurada (evita eventos de 2027 o lejanos)."""
     today = date.today()
@@ -763,7 +812,14 @@ def get_sorted_future_events(articles: List[Dict[str, Any]], max_days: int = MAX
                 pass
 
     future_events.sort(key=lambda x: x["dt_key"])
-    return future_events
+
+    # Quitar el mismo evento publicado por varias fuentes (se queda el primero)
+    unique_events: List[Dict[str, Any]] = []
+    for ev in future_events:
+        candidate = {"title": ev["title"], "event_date_key": ev["dt_key"].isoformat()}
+        if not any(is_same_event(candidate, {"title": u["title"], "event_date_key": u["dt_key"].isoformat()}) for u in unique_events):
+            unique_events.append(ev)
+    return unique_events
 
 
 def get_future_events_from_state(state: Dict[str, Any], max_days: int = MAX_FUTURE_DAYS) -> List[Dict[str, Any]]:
@@ -1445,7 +1501,24 @@ def run(force_future_summary: bool = False, server_mode: bool = False):
     logger.info(f"Nuevos eventos/planes encontrados: {len(new_articles)}")
 
     if new_articles:
+        notified_count = 0
         for art in new_articles:
+            # Si otra fuente ya publicó el mismo evento (misma fecha y título parecido), no se repite el aviso
+            duplicate_of = find_same_event(art, cleaned_saved_articles)
+            if duplicate_of:
+                logger.info(f"Omitiendo alerta de {art['title']}: mismo evento que {duplicate_of}")
+                cleaned_saved_articles[art["url"]] = {
+                    "title": art["title"],
+                    "source": art["source"],
+                    "event_date": art.get("event_date", ""),
+                    "event_date_key": art.get("event_date_key"),
+                    "first_seen": now_iso,
+                    "notified_at": None,
+                    "duplicado_de": duplicate_of,
+                }
+                continue
+
+            notified_count += 1
             logger.info(f"Notificando nuevo evento: {art['title']} [{art.get('event_date')}] ({art['url']})")
             msg = format_article_message(art)
             broadcast_telegram_message(msg)
@@ -1462,7 +1535,7 @@ def run(force_future_summary: bool = False, server_mode: bool = False):
         previous_state["total_registrados"] = len(cleaned_saved_articles)
         previous_state["articulos"] = cleaned_saved_articles
         save_current_state(DATA_FILE, previous_state)
-        logger.info(f"Se han notificado {len(new_articles)} eventos nuevos a todos los suscriptores.")
+        logger.info(f"Se han notificado {notified_count} eventos nuevos a todos los suscriptores.")
     else:
         changed = False
         # Si se agregaron artículos archivados (ej. pasados) no registrados previamente
