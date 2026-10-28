@@ -13,6 +13,7 @@ Bot Python (`monitor.py`) que vigila VigoPeques (RSS/web), Metropolitano (API Ev
 ## Producción
 - GitHub Actions (`.github/workflows/monitor.yml`) cada 15 min + `repository_dispatch` (cron externo); restaura `suscriptores.json` desde la caché de Actions y hace commit de `estado_articulos.json`.
 - Render (`render.yaml`): servicio web `chapela-redondela-bot` con `python monitor.py --server`.
+- redondela.gal bloquea (403) las IPs de centros de datos (GitHub Actions, Cloudflare). El PC de casa ejecuta cada hora `python monitor.py --export-redondela` (tarea programada creada con `programar_exportacion_agenda.ps1`), que sube `agenda_redondela.json`; si la consulta en directo falla, Actions usa esa copia.
 - Haz `git pull` antes de trabajar: CI hace commits automáticos ("chore: actualizar registro de eventos [skip ci]").
 
 ## Notas

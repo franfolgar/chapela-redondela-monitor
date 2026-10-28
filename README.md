@@ -97,6 +97,20 @@ Si se prefiere una respuesta interactiva en tiempo real (< 1 segundo a comandos 
 
 ---
 
+### Agenda del Concello de Redondela desde el PC
+
+`redondela.gal` bloquea (403) las peticiones desde GitHub Actions y otros centros de datos. Para que el bot siga recibiendo sus eventos, un PC doméstico descarga la agenda y la sube al repositorio como `agenda_redondela.json`; si la consulta en directo falla, el monitor usa esa copia.
+
+```powershell
+# Exportar una vez (sin subir al repo):
+python monitor.py --export-redondela --no-push
+
+# Programar la exportación cada hora (commit y push solo si la agenda cambia):
+powershell -ExecutionPolicy Bypass -File programar_exportacion_agenda.ps1
+```
+
+---
+
 ### Opción 3: Ejecución local en Windows
 
 Para pruebas en local sin webhook:

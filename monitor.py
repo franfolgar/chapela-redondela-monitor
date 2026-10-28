@@ -53,6 +53,7 @@ KEYWORDS = [k.strip() for k in raw_keywords.split(",") if k.strip()]
 DATA_FILE = BASE_DIR / "estado_articulos.json"
 SUBSCRIBERS_FILE = BASE_DIR / "suscriptores.json"
 LOG_FILE = BASE_DIR / "monitor.log"
+REDONDELA_CACHE_FILE = BASE_DIR / "agenda_redondela.json"  # Copia exportada desde un PC (redondela.gal bloquea a GitHub)
 MAX_FUTURE_DAYS = 60  # Ventana máxima de eventos futuros a mostrar (próximos 2 meses)
 DATA_LOCK = threading.Lock()  # Previene condiciones de carrera en lectura/escritura concurrente
 
@@ -518,56 +519,142 @@ def fetch_vigopeques_searches(session: requests.Session, keywords: List[str]) ->
     return items
 
 
-def fetch_redondela_agenda(session: requests.Session) -> List[Dict[str, Any]]:
-    """Extrae eventos oficiales de la Axenda Completa de redondela.gal (The Events Calendar API)."""
+def fetch_redondela_agenda_live(session: requests.Session) -> List[Dict[str, Any]]:
+    """
+    Extrae eventos oficiales de la Axenda Completa de redondela.gal (The Events Calendar API).
+    Lanza excepción si la web no responde: redondela.gal bloquea (403) las IPs de centros de datos
+    como GitHub Actions o Cloudflare.
+    """
     items = []
     url = f"https://redondela.gal/wp-json/tribe/events/v1/events?categories=axenda-completa&per_page=50&start_date={date.today().isoformat()}"
-    try:
-        logger.info("Consultando Axenda Completa de Concello de Redondela (redondela.gal)...")
-        headers = {
-            "Referer": "https://redondela.gal/agenda/categoria/axenda-completa/",
-            "Accept": "application/json, text/plain, */*",
-        }
-        resp = session.get(url, headers=headers, timeout=20)
-        resp.raise_for_status()
-        data = resp.json()
-        events = data.get("events", [])
-        for ev in events:
-            link = clean_url(ev.get("url", ""))
-            raw_title = ev.get("title", "")
-            raw_desc = ev.get("description", "")
-            start_date_str = ev.get("start_date", "")
+    logger.info("Consultando Axenda Completa de Concello de Redondela (redondela.gal)...")
+    headers = {
+        "Referer": "https://redondela.gal/agenda/categoria/axenda-completa/",
+        "Accept": "application/json, text/plain, */*",
+    }
+    resp = session.get(url, headers=headers, timeout=20)
+    resp.raise_for_status()
+    data = resp.json()
+    events = data.get("events", [])
+    for ev in events:
+        link = clean_url(ev.get("url", ""))
+        raw_title = ev.get("title", "")
+        raw_desc = ev.get("description", "")
+        start_date_str = ev.get("start_date", "")
 
-            event_date = ""
-            dt_key = None
-            if start_date_str:
-                try:
-                    dt = datetime.strptime(start_date_str, "%Y-%m-%d %H:%M:%S")
-                    dt_key = dt.date()
-                    day_name = DAYS_ES[dt.weekday()]
-                    month_name = MONTHS_ES[dt.month]
-                    time_part = f" ({dt.hour:02d}:{dt.minute:02d})" if (dt.hour != 0 or dt.minute != 0) else ""
-                    event_date = f"{day_name}, {dt.day} de {month_name}{time_part}"
-                except Exception:
-                    event_date = start_date_str[:10]
+        event_date = ""
+        dt_key = None
+        if start_date_str:
+            try:
+                dt = datetime.strptime(start_date_str, "%Y-%m-%d %H:%M:%S")
+                dt_key = dt.date()
+                day_name = DAYS_ES[dt.weekday()]
+                month_name = MONTHS_ES[dt.month]
+                time_part = f" ({dt.hour:02d}:{dt.minute:02d})" if (dt.hour != 0 or dt.minute != 0) else ""
+                event_date = f"{day_name}, {dt.day} de {month_name}{time_part}"
+            except Exception:
+                event_date = start_date_str[:10]
 
-            title_clean = strip_html(raw_title)
-            desc_clean = strip_html(raw_desc)
+        title_clean = strip_html(raw_title)
+        desc_clean = strip_html(raw_desc)
 
-            items.append({
-                "id": str(ev.get("id")),
-                "url": link,
-                "title": title_clean,
-                "content": desc_clean,
-                "source": "Concello de Redondela (Axenda)",
-                "event_date": event_date,
-                "event_date_key": dt_key.isoformat() if dt_key else None,
-                "date": ev.get("date", ""),
-            })
-        logger.info(f"Concello de Redondela: {len(items)} eventos obtenidos de Axenda Completa.")
-    except Exception as e:
-        logger.error(f"Error consultando agenda de redondela.gal: {e}")
+        items.append({
+            "id": str(ev.get("id")),
+            "url": link,
+            "title": title_clean,
+            "content": desc_clean,
+            "source": "Concello de Redondela (Axenda)",
+            "event_date": event_date,
+            "event_date_key": dt_key.isoformat() if dt_key else None,
+            "date": ev.get("date", ""),
+        })
+    logger.info(f"Concello de Redondela: {len(items)} eventos obtenidos de Axenda Completa.")
     return items
+
+
+def load_redondela_cache() -> List[Dict[str, Any]]:
+    """Carga la copia de la agenda del Concello exportada desde un PC doméstico (--export-redondela)."""
+    if not REDONDELA_CACHE_FILE.exists():
+        logger.error(f"No existe {REDONDELA_CACHE_FILE.name}; no hay eventos del Concello disponibles.")
+        return []
+    try:
+        with open(REDONDELA_CACHE_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception as e:
+        logger.error(f"Error al leer {REDONDELA_CACHE_FILE.name}: {e}")
+        return []
+    today_iso = date.today().isoformat()
+    items = [
+        ev for ev in data.get("events", [])
+        if not ev.get("event_date_key") or ev["event_date_key"] >= today_iso
+    ]
+    logger.info(
+        f"Concello de Redondela: {len(items)} eventos desde la copia {REDONDELA_CACHE_FILE.name} "
+        f"(generada {data.get('generated_at', '?')})."
+    )
+    return items
+
+
+def fetch_redondela_agenda(session: requests.Session) -> List[Dict[str, Any]]:
+    """Consulta la agenda del Concello en directo y, si la web la bloquea, usa la copia exportada."""
+    try:
+        return fetch_redondela_agenda_live(session)
+    except Exception as e:
+        logger.warning(f"No se pudo consultar redondela.gal ({e}); se usa la copia local.")
+        return load_redondela_cache()
+
+
+def export_redondela_agenda(push: bool = True) -> int:
+    """
+    Descarga la agenda del Concello y la guarda en agenda_redondela.json para que GitHub Actions
+    pueda usarla. Pensado para ejecutarse en un PC doméstico (tarea programada de Windows).
+    Si push es True, hace commit y push solo de ese fichero. Devuelve el código de salida.
+    """
+    import subprocess
+
+    try:
+        items = fetch_redondela_agenda_live(create_session())
+    except Exception as e:
+        logger.error(f"Exportación cancelada: no se pudo consultar redondela.gal ({e}).")
+        return 1
+
+    previous_events = None
+    if REDONDELA_CACHE_FILE.exists():
+        try:
+            with open(REDONDELA_CACHE_FILE, "r", encoding="utf-8") as f:
+                previous_events = json.load(f).get("events")
+        except Exception:
+            pass
+    if previous_events == items:
+        logger.info("La agenda del Concello no ha cambiado; no hay nada que exportar.")
+        return 0
+
+    payload = {"generated_at": datetime.now().isoformat(timespec="seconds"), "events": items}
+    temp_file = REDONDELA_CACHE_FILE.parent / f"{REDONDELA_CACHE_FILE.name}.tmp"
+    with open(temp_file, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+    temp_file.replace(REDONDELA_CACHE_FILE)
+    logger.info(f"Agenda del Concello exportada a {REDONDELA_CACHE_FILE.name} ({len(items)} eventos).")
+
+    if not push:
+        return 0
+
+    # Sin ventana de consola al ejecutarse desde la tarea programada (pythonw)
+    no_window = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+    def git(*args: str) -> None:
+        subprocess.run(["git", *args], cwd=BASE_DIR, check=True, capture_output=True, text=True, creationflags=no_window)
+
+    try:
+        git("add", REDONDELA_CACHE_FILE.name)
+        git("commit", "-m", "chore: actualizar agenda del Concello de Redondela [skip ci]", "--", REDONDELA_CACHE_FILE.name)
+        git("pull", "--rebase", "--autostash")
+        git("push")
+        logger.info("Agenda del Concello subida al repositorio.")
+        return 0
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Error en git {' '.join(e.cmd[1:2])}: {(e.stderr or e.stdout or '').strip()}")
+        return 1
 
 
 # ==============================================================================
@@ -1586,6 +1673,8 @@ if __name__ == "__main__":
         run_web_server(port)
     elif "--listen" in sys.argv or "--daemon" in sys.argv:
         run_listener_loop()
+    elif "--export-redondela" in sys.argv:
+        sys.exit(export_redondela_agenda(push="--no-push" not in sys.argv))
     else:
         send_summary = "--send-future" in sys.argv
         run(force_future_summary=send_summary)
