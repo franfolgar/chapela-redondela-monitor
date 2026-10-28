@@ -80,6 +80,30 @@ logging.basicConfig(
 logger = logging.getLogger("ChapelaMonitor")
 
 
+class RedactTokenFilter(logging.Filter):
+    """Oculta el token del bot si aparece en un log (p. ej. en la URL de un error de requests)."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if TELEGRAM_TOKEN:
+            message = record.getMessage()
+            if TELEGRAM_TOKEN in message:
+                record.msg = message.replace(TELEGRAM_TOKEN, "***")
+                record.args = None
+        return True
+
+
+logger.addFilter(RedactTokenFilter())
+
+
+def mask_chat_id(chat_id: Any) -> str:
+    """
+    Versión parcial de un chat ID para los logs: el repo es público y los logs de
+    GitHub Actions también, así que no se registran IDs completos ni nombres.
+    """
+    text = str(chat_id)
+    return f"…{text[-3:]}" if len(text) > 3 else "…"
+
+
 # ==============================================================================
 # UTILIDADES Y FILTRADO ESTRICTO DE SECCIONES
 # ==============================================================================
@@ -1050,12 +1074,12 @@ def send_telegram_message(chat_id: str, message: str) -> str:
         try:
             resp = requests.post(url, json=payload, timeout=20)
             if resp.status_code == 403:
-                logger.warning(f"Chat {chat_id} no acepta mensajes (bot bloqueado o cuenta eliminada).")
+                logger.warning(f"Chat {mask_chat_id(chat_id)} no acepta mensajes (bot bloqueado o cuenta eliminada).")
                 return "blocked"
             resp.raise_for_status()
-            logger.info(f"Mensaje ({len(chunk)} chars) enviado con éxito a chat {chat_id}.")
+            logger.info(f"Mensaje ({len(chunk)} chars) enviado con éxito a chat {mask_chat_id(chat_id)}.")
         except Exception as e:
-            logger.error(f"Error al enviar mensaje a Telegram (chat {chat_id}): {e}")
+            logger.error(f"Error al enviar mensaje a Telegram (chat {mask_chat_id(chat_id)}): {e}")
             status = "error"
     return status
 
@@ -1078,7 +1102,7 @@ def mark_unsubscribed(chat_ids: List[str], reason: str) -> None:
         entry["unsubscribed"] = True
         entry["unsubscribed_at"] = datetime.now().isoformat()
         entry["unsubscribed_reason"] = reason
-        logger.info(f"Suscriptor {cid} dado de baja ({reason}).")
+        logger.info(f"Suscriptor {mask_chat_id(cid)} dado de baja ({reason}).")
     save_subscribers(subscribers)
 
 
@@ -1249,7 +1273,7 @@ def handle_single_update(
         cid = str(member_update.get("chat", {}).get("id", ""))
         new_status = member_update.get("new_chat_member", {}).get("status", "")
         if cid in subscribers and new_status in ("kicked", "left") and is_active_subscriber(subscribers[cid]):
-            logger.info(f"El chat {cid} ha bloqueado o eliminado el bot; se da de baja.")
+            logger.info(f"El chat {mask_chat_id(cid)} ha bloqueado o eliminado el bot; se da de baja.")
             subscribers[cid]["unsubscribed"] = True
             subscribers[cid]["unsubscribed_at"] = datetime.now().isoformat()
             subscribers[cid]["unsubscribed_reason"] = "bot bloqueado"
@@ -1283,7 +1307,7 @@ def handle_single_update(
 
     if is_stop_cmd:
         if not is_new_user and not is_unsubscribed:
-            logger.info(f"Baja solicitada por {first_name} [ID: {cid}]")
+            logger.info(f"Baja solicitada por chat {mask_chat_id(cid)}")
             subscribers[cid]["unsubscribed"] = True
             subscribers[cid]["unsubscribed_at"] = datetime.now().isoformat()
             subscribers[cid]["unsubscribed_reason"] = "/stop"
@@ -1296,7 +1320,7 @@ def handle_single_update(
 
     elif is_new_user or (is_unsubscribed and is_start_cmd):
         # Solo /start reactiva a quien se dio de baja; cualquier mensaje da de alta a un usuario nuevo
-        logger.info(f"Nuevo suscriptor detectado: {first_name} (@{username}) [ID: {cid}]")
+        logger.info(f"Nuevo suscriptor detectado: chat {mask_chat_id(cid)}")
         subscribers[cid] = {
             "first_name": first_name,
             "username": username,
@@ -1308,21 +1332,21 @@ def handle_single_update(
         send_telegram_message(cid, welcome_msg)
 
     elif is_events_cmd:
-        logger.info(f"Comando de eventos de {first_name} [ID: {cid}]")
+        logger.info(f"Comando de eventos de chat {mask_chat_id(cid)}")
         subscribers[cid]["last_interaction"] = datetime.now().isoformat()
         user_changed = True
         summary_msg = build_events_summary_message(first_name, future_events)
         send_telegram_message(cid, summary_msg)
 
     elif is_start_cmd:
-        logger.info(f"Comando /start de suscriptor existente: {first_name} [ID: {cid}]")
+        logger.info(f"Comando /start de suscriptor existente: chat {mask_chat_id(cid)}")
         subscribers[cid]["last_interaction"] = datetime.now().isoformat()
         user_changed = True
         welcome_msg = build_welcome_message(first_name, future_events)
         send_telegram_message(cid, welcome_msg)
 
     elif is_help_cmd:
-        logger.info(f"Comando de ayuda de {first_name} [ID: {cid}]")
+        logger.info(f"Comando de ayuda de chat {mask_chat_id(cid)}")
         help_msg = (
             "ℹ️ <b>BOT DE EVENTOS DE CHAPELA Y REDONDELA</b> 📍\n\n"
             "Comandos disponibles:\n"
