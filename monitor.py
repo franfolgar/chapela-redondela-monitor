@@ -203,6 +203,24 @@ def clean_date_display(raw_date: str) -> str:
     return txt.capitalize().strip()
 
 
+def build_event_date(day: int, month: int, text: str) -> Optional[date]:
+    """
+    Construye la fecha del evento. Si el texto no indica el año y la fecha quedaría
+    hace más de 6 meses, se asume el año siguiente (p. ej. "5 de enero" leído en diciembre).
+    """
+    today = date.today()
+    m_yr = re.search(r"\b(20\d{2})\b", text)
+    try:
+        if m_yr:
+            return date(int(m_yr.group(1)), month, day)
+        candidate = date(today.year, month, day)
+        if candidate < today - timedelta(days=180):
+            candidate = date(today.year + 1, month, day)
+        return candidate
+    except ValueError:
+        return None
+
+
 def extract_event_date(session: requests.Session, url: str, title: str, content: str, pub_date: str) -> Tuple[str, Optional[date]]:
     """Determina la fecha del evento a partir de metadatos o menciones en el texto."""
     event_date_str = ""
@@ -239,19 +257,12 @@ def extract_event_date(session: requests.Session, url: str, title: str, content:
                 day = int(m_month.group(1))
                 month_name = m_month.group(2).lower()
                 month = MONTH_MAP.get(month_name)
-                year = date.today().year
-                m_yr = re.search(r"\b(20\d{2})\b", m)
-                if m_yr:
-                    year = int(m_yr.group(1))
                 if month:
-                    try:
-                        k = date(year, month, day)
-                        if k >= date.today():
-                            event_date_str = m
-                            dt_key = k
-                            break
-                    except ValueError:
-                        pass
+                    k = build_event_date(day, month, m)
+                    if k and k >= date.today():
+                        event_date_str = m
+                        dt_key = k
+                        break
 
         if not event_date_str and all_matches:
             event_date_str = all_matches[0]
@@ -266,15 +277,8 @@ def extract_event_date(session: requests.Session, url: str, title: str, content:
             day = int(m_month.group(1))
             month_name = m_month.group(2).lower()
             month = MONTH_MAP.get(month_name)
-            year = date.today().year
-            m_yr = re.search(r"\b(20\d{2})\b", event_date_str)
-            if m_yr:
-                year = int(m_yr.group(1))
             if month:
-                try:
-                    dt_key = date(year, month, day)
-                except ValueError:
-                    pass
+                dt_key = build_event_date(day, month, event_date_str)
 
     if not event_date_str:
         if pub_date:
@@ -881,14 +885,17 @@ def split_telegram_text(text: str, max_chars: int = 4000) -> List[str]:
     return [c for c in chunks if c.strip()]
 
 
-def send_telegram_message(chat_id: str, message: str) -> bool:
-    """Envía un mensaje con formato HTML a un chat concreto de Telegram, dividiendo de forma segura si excede el límite de 4096 caracteres."""
+def send_telegram_message(chat_id: str, message: str) -> str:
+    """
+    Envía un mensaje con formato HTML a un chat concreto de Telegram, dividiendo de forma segura si excede el límite de 4096 caracteres.
+    Devuelve "ok", "blocked" (el usuario bloqueó el bot o borró su cuenta: error 403) o "error".
+    """
     if not TELEGRAM_TOKEN or not chat_id:
-        return False
+        return "error"
 
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     chunks = split_telegram_text(message, max_chars=4000)
-    success = True
+    status = "ok"
 
     for chunk in chunks:
         payload = {
@@ -899,24 +906,55 @@ def send_telegram_message(chat_id: str, message: str) -> bool:
         }
         try:
             resp = requests.post(url, json=payload, timeout=20)
+            if resp.status_code == 403:
+                logger.warning(f"Chat {chat_id} no acepta mensajes (bot bloqueado o cuenta eliminada).")
+                return "blocked"
             resp.raise_for_status()
             logger.info(f"Mensaje ({len(chunk)} chars) enviado con éxito a chat {chat_id}.")
         except Exception as e:
             logger.error(f"Error al enviar mensaje a Telegram (chat {chat_id}): {e}")
-            success = False
-    return success
+            status = "error"
+    return status
+
+
+def is_active_subscriber(data: Dict[str, Any]) -> bool:
+    """Un suscriptor está activo salvo que se haya dado de baja o haya bloqueado el bot."""
+    return not data.get("unsubscribed")
+
+
+def mark_unsubscribed(chat_ids: List[str], reason: str) -> None:
+    """
+    Marca chats como dados de baja. Se conservan con la marca (en lugar de borrarlos)
+    para que load_subscribers no vuelva a añadirlos desde SUBSCRIBERS_SEED.
+    """
+    if not chat_ids:
+        return
+    subscribers = load_subscribers()
+    for cid in chat_ids:
+        entry = subscribers.setdefault(cid, {})
+        entry["unsubscribed"] = True
+        entry["unsubscribed_at"] = datetime.now().isoformat()
+        entry["unsubscribed_reason"] = reason
+        logger.info(f"Suscriptor {cid} dado de baja ({reason}).")
+    save_subscribers(subscribers)
 
 
 def broadcast_telegram_message(message: str) -> None:
-    """Difunde un mensaje a todos los suscriptores registrados con control de tasa de Telegram."""
+    """Difunde un mensaje a todos los suscriptores activos con control de tasa de Telegram."""
     subscribers = load_subscribers()
     if not subscribers and TELEGRAM_CHAT_ID:
         send_telegram_message(TELEGRAM_CHAT_ID, message)
         return
 
-    for cid in list(subscribers.keys()):
-        send_telegram_message(cid, message)
+    blocked = []
+    for cid, data in list(subscribers.items()):
+        if not is_active_subscriber(data):
+            continue
+        if send_telegram_message(cid, message) == "blocked":
+            blocked.append(cid)
         time.sleep(0.05)  # 50ms rate limit protection
+
+    mark_unsubscribed(blocked, "bot bloqueado")
 
 
 def build_future_events_text(future_events: List[Dict[str, Any]]) -> str:
@@ -1029,6 +1067,17 @@ def delete_telegram_webhook() -> bool:
     """Elimina el webhook de Telegram para permitir getUpdates / long polling sin conflictos."""
     if not TELEGRAM_TOKEN:
         return False
+    try:
+        info = requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getWebhookInfo", timeout=10).json()
+        webhook_url = info.get("result", {}).get("url", "")
+        if not webhook_url:
+            return True
+        logger.warning(
+            f"Había un webhook activo ({webhook_url}); se elimina para usar getUpdates. "
+            "Si el servidor de Render sigue en marcha, no lo uses a la vez que este modo."
+        )
+    except Exception:
+        pass
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/deleteWebhook"
     try:
         resp = requests.post(url, timeout=10)
@@ -1046,7 +1095,27 @@ def handle_single_update(
     Procesa una actualización individual de Telegram (/start, /eventos, /ayuda, etc.).
     Devuelve True si se registró o modificó algún suscriptor.
     """
-    msg = up.get("message") or up.get("my_chat_member")
+    save_immediately = False
+    if subscribers is None:
+        subscribers = load_subscribers()
+        save_immediately = True
+
+    # Cambios de estado del bot en un chat (bloqueado, eliminado, desbloqueado): no son mensajes
+    member_update = up.get("my_chat_member")
+    if member_update:
+        cid = str(member_update.get("chat", {}).get("id", ""))
+        new_status = member_update.get("new_chat_member", {}).get("status", "")
+        if cid in subscribers and new_status in ("kicked", "left") and is_active_subscriber(subscribers[cid]):
+            logger.info(f"El chat {cid} ha bloqueado o eliminado el bot; se da de baja.")
+            subscribers[cid]["unsubscribed"] = True
+            subscribers[cid]["unsubscribed_at"] = datetime.now().isoformat()
+            subscribers[cid]["unsubscribed_reason"] = "bot bloqueado"
+            if save_immediately:
+                save_subscribers(subscribers)
+            return True
+        return False
+
+    msg = up.get("message")
     if not msg:
         return False
 
@@ -1060,19 +1129,30 @@ def handle_single_update(
     if not cid:
         return False
 
-    save_immediately = False
-    if subscribers is None:
-        subscribers = load_subscribers()
-        save_immediately = True
-
     is_new_user = cid not in subscribers
+    is_unsubscribed = not is_new_user and not is_active_subscriber(subscribers[cid])
     is_start_cmd = text.startswith("/start")
+    is_stop_cmd = text.startswith("/stop") or text.startswith("/baja")
     is_events_cmd = text.startswith("/eventos") or text.startswith("/agenda") or text.startswith("/cartelera")
     is_help_cmd = text.startswith("/ayuda") or text.startswith("/help")
 
     user_changed = False
 
-    if is_new_user:
+    if is_stop_cmd:
+        if not is_new_user and not is_unsubscribed:
+            logger.info(f"Baja solicitada por {first_name} [ID: {cid}]")
+            subscribers[cid]["unsubscribed"] = True
+            subscribers[cid]["unsubscribed_at"] = datetime.now().isoformat()
+            subscribers[cid]["unsubscribed_reason"] = "/stop"
+            user_changed = True
+        send_telegram_message(
+            cid,
+            "👋 Te has dado de baja y ya no recibirás avisos de eventos.\n"
+            "Si quieres volver, escribe /start cuando quieras."
+        )
+
+    elif is_new_user or (is_unsubscribed and is_start_cmd):
+        # Solo /start reactiva a quien se dio de baja; cualquier mensaje da de alta a un usuario nuevo
         logger.info(f"Nuevo suscriptor detectado: {first_name} (@{username}) [ID: {cid}]")
         subscribers[cid] = {
             "first_name": first_name,
@@ -1105,7 +1185,8 @@ def handle_single_update(
             "Comandos disponibles:\n"
             "• /eventos - Cartelera de las próximas semanas.\n"
             "• /start - Mensaje de bienvenida e información inicial.\n"
-            "• /ayuda - Muestra esta ayuda.\n\n"
+            "• /ayuda - Muestra esta ayuda.\n"
+            "• /stop - Darse de baja de los avisos.\n\n"
             "<i>Recibirás un aviso automático en cuanto se detecte cualquier nuevo evento en Chapela o Redondela.</i>"
         )
         send_telegram_message(cid, help_msg)
@@ -1174,19 +1255,25 @@ def process_telegram_updates(future_events: List[Dict[str, Any]], poll_timeout: 
 # EJECUCIÓN PRINCIPAL
 # ==============================================================================
 
-def run(force_future_summary: bool = False):
+def run(force_future_summary: bool = False, server_mode: bool = False):
+    """
+    Ejecuta una pasada completa de comprobación.
+    En server_mode (Render) los comandos llegan por webhook: no se toca el webhook ni se usa getUpdates.
+    """
     logger.info("=================================================================")
     logger.info(f"Iniciando monitorización: Chapela & Redondela ({datetime.now().isoformat()})")
     logger.info("=================================================================")
 
     # Asegurar que el webhook de Telegram esté deshabilitado para permitir getUpdates sin conflictos (error 409)
-    delete_telegram_webhook()
+    if not server_mode:
+        delete_telegram_webhook()
 
     # PASO 1: Cargar estado previo y responder a Telegram DE INMEDIATO (< 1 seg)
     # Evita que el usuario tenga que esperar mientras se consultan las webs.
     previous_state = load_previous_state(DATA_FILE)
     cached_future_events = get_future_events_from_state(previous_state)
-    process_telegram_updates(cached_future_events)
+    if not server_mode:
+        process_telegram_updates(cached_future_events)
 
     # PASO 2: Consultar fuentes web para detectar nuevos eventos
     known_articles = previous_state.get("articulos", {})
@@ -1194,7 +1281,8 @@ def run(force_future_summary: bool = False):
     future_events = get_sorted_future_events(current_matches)
 
     # PASO 3: Procesar Telegram de nuevo por si entraron comandos durante el scrape
-    process_telegram_updates(future_events)
+    if not server_mode:
+        process_telegram_updates(future_events)
 
     cleaned_saved_articles = {}
     for url, art in previous_state.get("articulos", {}).items():
@@ -1336,7 +1424,7 @@ class TelegramWebhookHandler(BaseHTTPRequestHandler):
                 "status": "healthy",
                 "service": "Chapela y Redondela Event Monitor Bot",
                 "total_articulos": len(previous_state.get("articulos", {})),
-                "total_suscriptores": len(subscribers),
+                "total_suscriptores": sum(1 for d in subscribers.values() if is_active_subscriber(d)),
                 "timestamp": datetime.now().isoformat(),
             }
             self.wfile.write(json.dumps(resp, ensure_ascii=False).encode("utf-8"))
@@ -1360,7 +1448,7 @@ class TelegramWebhookHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "text/plain; charset=utf-8")
             self.end_headers()
             self.wfile.write(b"Ejecutando escaneo manual de eventos en segundo plano...\n")
-            threading.Thread(target=run, kwargs={"force_future_summary": False}, daemon=True).start()
+            threading.Thread(target=run, kwargs={"force_future_summary": False, "server_mode": True}, daemon=True).start()
         else:
             self.send_response(404)
             self.end_headers()
@@ -1392,7 +1480,7 @@ class TelegramWebhookHandler(BaseHTTPRequestHandler):
                         current_matches = get_all_matched_articles(known_articles=previous_state.get("articulos", {}))
                         future_events = get_sorted_future_events(current_matches)
                         if current_matches:
-                            threading.Thread(target=run, kwargs={"force_future_summary": False}, daemon=True).start()
+                            threading.Thread(target=run, kwargs={"force_future_summary": False, "server_mode": True}, daemon=True).start()
 
                     handle_single_update(update, future_events)
             except Exception as e:
@@ -1431,7 +1519,7 @@ def run_web_server(port: int = 10000):
     if not previous_state.get("articulos"):
         logger.info("Base de eventos vacía al arrancar. Ejecutando escaneo inicial de artículos...")
         try:
-            run(force_future_summary=False)
+            run(force_future_summary=False, server_mode=True)
         except Exception as e:
             logger.error(f"Error en escaneo inicial síncrono: {e}")
 
@@ -1442,7 +1530,7 @@ def run_web_server(port: int = 10000):
             try:
                 time.sleep(1800)
                 logger.info("Ejecutando ciclo periódico de comprobación de eventos desde Render...")
-                run(force_future_summary=False)
+                run(force_future_summary=False, server_mode=True)
             except Exception as e:
                 logger.error(f"Error en ciclo periódico de scraping: {e}")
 

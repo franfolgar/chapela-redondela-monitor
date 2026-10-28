@@ -72,5 +72,11 @@ jobs:
             echo "No hay cambios en el registro de eventos."
           else
             git commit -m "chore: actualizar registro de eventos [skip ci]"
-            git push
+            # Integrar commits que hayan llegado durante la ejecución para que el push no se rechace
+            for intento in 1 2 3; do
+              git pull --rebase origin "${GITHUB_REF_NAME}" && git push && exit 0
+              echo "Push rechazado (intento $intento); reintentando..."
+              sleep 5
+            done
+            exit 1
           fi
