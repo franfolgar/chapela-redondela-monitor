@@ -6,6 +6,11 @@ on:
     - cron: '*/15 * * * *'
   workflow_dispatch:
     # Permite ejecutar manualmente la comprobación en cualquier momento desde la pestaña Actions en GitHub
+    inputs:
+      send_future:
+        description: 'Enviar la cartelera de próximos eventos a todos los suscriptores'
+        type: boolean
+        default: false
   repository_dispatch:
     # Permite disparar la comprobación desde un cron externo (ej. cron-job.org) con puntualidad al segundo
     types: [check-events, cron]
@@ -54,7 +59,11 @@ jobs:
           SUBSCRIBERS_SEED: ${{ secrets.SUBSCRIBERS_SEED }}
           KEYWORDS: ${{ secrets.KEYWORDS || 'Chapela,Redondela' }}
         run: |
-          python monitor.py
+          if [ "${{ inputs.send_future }}" = "true" ]; then
+            python monitor.py --send-future
+          else
+            python monitor.py
+          fi
 
       - name: Guardar suscriptores en la caché
         uses: actions/cache/save@v4
