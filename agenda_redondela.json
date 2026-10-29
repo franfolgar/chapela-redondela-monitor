@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-28T12:28:01",
+  "generated_at": "2026-10-29T11:00:03",
   "events": [
     {
       "id": "31293",
@@ -10,6 +10,16 @@
       "event_date": "Jueves, 29 de octubre (18:30)",
       "event_date_key": "2026-10-29",
       "date": "2026-10-23 19:50:21"
+    },
+    {
+      "id": "31330",
+      "url": "https://redondela.gal/evento/natacion-liga-de-clubs/",
+      "title": "NATACIÓN – Liga de Clubs",
+      "content": "",
+      "source": "Concello de Redondela (Axenda)",
+      "event_date": "Sábado, 31 de octubre (17:00)",
+      "event_date_key": "2026-10-31",
+      "date": "2026-10-29 11:52:54"
     },
     {
       "id": "30854",
