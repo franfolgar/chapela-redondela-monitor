@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-29T11:00:03",
+  "generated_at": "2026-10-29T17:00:03",
   "events": [
     {
       "id": "31293",
@@ -10,6 +10,26 @@
       "event_date": "Jueves, 29 de octubre (18:30)",
       "event_date_key": "2026-10-29",
       "date": "2026-10-23 19:50:21"
+    },
+    {
+      "id": "31351",
+      "url": "https://redondela.gal/evento/conferencia-que-pasou-con-humberto-baena/",
+      "title": "Conferencia: “Que pasou con Humberto Baena?”",
+      "content": "Testemuño de Flor Baena, irmá de Xosé Humberto Baena (executado en 1975).",
+      "source": "Concello de Redondela (Axenda)",
+      "event_date": "Viernes, 30 de octubre (19:00)",
+      "event_date_key": "2026-10-30",
+      "date": "2026-10-29 17:45:50"
+    },
+    {
+      "id": "31347",
+      "url": "https://redondela.gal/evento/samain-2026/",
+      "title": "Samain 2026",
+      "content": "",
+      "source": "Concello de Redondela (Axenda)",
+      "event_date": "Sábado, 31 de octubre",
+      "event_date_key": "2026-10-31",
+      "date": "2026-10-29 17:44:05"
     },
     {
       "id": "31330",
