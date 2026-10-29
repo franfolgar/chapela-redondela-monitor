@@ -1,7 +1,7 @@
 {
   "created_at": "2026-10-24T22:20:19.323545",
-  "last_check": "2026-10-29T10:01:01.516584",
-  "total_registrados": 48,
+  "last_check": "2026-10-29T16:01:11.349217",
+  "total_registrados": 50,
   "articulos": {
     "https://metropolitano.gal/agenda/magosto-y-tunel-del-terror-en-chapela/": {
       "title": "Magosto y Túnel del terror en Chapela",
@@ -475,6 +475,22 @@
       "event_date_key": "2026-10-31",
       "first_seen": "2026-10-29T10:01:01.516584",
       "notified_at": "2026-10-29T10:01:01.516584"
+    },
+    "https://redondela.gal/evento/conferencia-que-pasou-con-humberto-baena/": {
+      "title": "Conferencia: “Que pasou con Humberto Baena?”",
+      "source": "Concello de Redondela (Axenda)",
+      "event_date": "Viernes, 30 de octubre (19:00)",
+      "event_date_key": "2026-10-30",
+      "first_seen": "2026-10-29T16:01:11.349217",
+      "notified_at": "2026-10-29T16:01:11.349217"
+    },
+    "https://redondela.gal/evento/samain-2026/": {
+      "title": "Samain 2026",
+      "source": "Concello de Redondela (Axenda)",
+      "event_date": "Sábado, 31 de octubre",
+      "event_date_key": "2026-10-31",
+      "first_seen": "2026-10-29T16:01:11.349217",
+      "notified_at": "2026-10-29T16:01:11.349217"
     }
   }
 }
