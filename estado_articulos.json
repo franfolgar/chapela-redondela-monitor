@@ -1,7 +1,7 @@
 {
   "created_at": "2026-10-24T22:20:19.323545",
-  "last_check": "2026-10-29T16:01:11.349217",
-  "total_registrados": 50,
+  "last_check": "2026-11-06T20:01:11.217257",
+  "total_registrados": 51,
   "articulos": {
     "https://metropolitano.gal/agenda/magosto-y-tunel-del-terror-en-chapela/": {
       "title": "Magosto y Túnel del terror en Chapela",
@@ -491,6 +491,14 @@
       "event_date_key": "2026-10-31",
       "first_seen": "2026-10-29T16:01:11.349217",
       "notified_at": "2026-10-29T16:01:11.349217"
+    },
+    "https://metropolitano.gal/que-hacer/furanchos-vino-gratis-magostos-y-tapeo-en-el-primer-finde-completo-de-noviembre-en-vigo-y-su-area/": {
+      "title": "Furanchos, vino gratis, magostos y tapeo en el primer finde completo de noviembre en Vigo y su área",
+      "source": "Metropolitano (Qué Hacer)",
+      "event_date": "Sábado 7 de noviembre",
+      "event_date_key": "2026-11-07",
+      "first_seen": "2026-11-06T20:01:11.217257",
+      "notified_at": "2026-11-06T20:01:11.217257"
     }
   }
 }
