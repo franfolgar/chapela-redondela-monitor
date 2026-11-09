@@ -1,7 +1,7 @@
 {
   "created_at": "2026-10-24T22:20:19.323545",
-  "last_check": "2026-11-06T20:01:11.217257",
-  "total_registrados": 51,
+  "last_check": "2026-11-09T16:15:42.284808",
+  "total_registrados": 52,
   "articulos": {
     "https://metropolitano.gal/agenda/magosto-y-tunel-del-terror-en-chapela/": {
       "title": "Magosto y Túnel del terror en Chapela",
@@ -499,6 +499,14 @@
       "event_date_key": "2026-11-07",
       "first_seen": "2026-11-06T20:01:11.217257",
       "notified_at": "2026-11-06T20:01:11.217257"
+    },
+    "https://metropolitano.gal/que-hacer/vino-gratis-y-un-famoso-humorista-en-el-magosto-que-promete-redondela-con-sus-castanas/": {
+      "title": "Vino gratis y un famoso humorista en el magosto que promete Redondela con sus castañas",
+      "source": "Metropolitano (Qué Hacer)",
+      "event_date": "Sábado 14 de noviembre",
+      "event_date_key": "2026-11-14",
+      "first_seen": "2026-11-09T16:15:42.284808",
+      "notified_at": "2026-11-09T16:15:42.284808"
     }
   }
 }
