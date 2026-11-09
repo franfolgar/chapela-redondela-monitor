@@ -1,7 +1,7 @@
 {
   "created_at": "2026-10-24T22:20:19.323545",
-  "last_check": "2026-11-09T16:15:42.284808",
-  "total_registrados": 52,
+  "last_check": "2026-11-09T18:01:13.791332",
+  "total_registrados": 53,
   "articulos": {
     "https://metropolitano.gal/agenda/magosto-y-tunel-del-terror-en-chapela/": {
       "title": "Magosto y Túnel del terror en Chapela",
@@ -507,6 +507,14 @@
       "event_date_key": "2026-11-14",
       "first_seen": "2026-11-09T16:15:42.284808",
       "notified_at": "2026-11-09T16:15:42.284808"
+    },
+    "https://metropolitano.gal/que-hacer/la-malasana-de-vigo-prepara-un-mercadillo-de-segunda-mano-con-musica-en-directo/": {
+      "title": "La Malasaña de Vigo prepara un mercadillo de segunda mano con música en directo",
+      "source": "Metropolitano (Qué Hacer)",
+      "event_date": "Sábado 14 de noviembre",
+      "event_date_key": "2026-11-14",
+      "first_seen": "2026-11-09T18:01:13.791332",
+      "notified_at": "2026-11-09T18:01:13.791332"
     }
   }
 }
