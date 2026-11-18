@@ -1,7 +1,7 @@
 {
   "created_at": "2026-10-24T22:20:19.323545",
-  "last_check": "2026-11-13T19:30:56.210698",
-  "total_registrados": 54,
+  "last_check": "2026-11-18T19:15:49.071346",
+  "total_registrados": 55,
   "articulos": {
     "https://metropolitano.gal/agenda/magosto-y-tunel-del-terror-en-chapela/": {
       "title": "Magosto y Túnel del terror en Chapela",
@@ -523,6 +523,14 @@
       "event_date_key": "2026-11-14",
       "first_seen": "2026-11-13T19:30:56.210698",
       "notified_at": "2026-11-13T19:30:56.210698"
+    },
+    "https://metropolitano.gal/que-hacer/djs-mercadillo-y-sesion-vermu-en-un-magosto-solidario-en-el-area-de-vigo/": {
+      "title": "DJs, mercadillo y sesión vermú en un magosto solidario en el área de Vigo",
+      "source": "Metropolitano (Qué Hacer)",
+      "event_date": "Sábado 21 de noviembre",
+      "event_date_key": "2026-11-21",
+      "first_seen": "2026-11-18T19:15:49.071346",
+      "notified_at": "2026-11-18T19:15:49.071346"
     }
   }
 }
