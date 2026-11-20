@@ -1,7 +1,7 @@
 {
   "created_at": "2026-10-24T22:20:19.323545",
-  "last_check": "2026-11-20T18:45:41.713883",
-  "total_registrados": 58,
+  "last_check": "2026-11-20T19:45:43.145244",
+  "total_registrados": 59,
   "articulos": {
     "https://metropolitano.gal/agenda/magosto-y-tunel-del-terror-en-chapela/": {
       "title": "Magosto y Túnel del terror en Chapela",
@@ -555,6 +555,14 @@
       "event_date_key": "2026-11-27",
       "first_seen": "2026-11-20T18:45:41.713883",
       "notified_at": "2026-11-20T18:45:41.713883"
+    },
+    "https://metropolitano.gal/que-hacer/navidad-callos-y-magostos-para-combatir-la-lluvia-de-este-fin-de-semana-con-planes-en-vigo-y-su-area/": {
+      "title": "Navidad, callos y magostos para combatir la lluvia de este fin de semana con planes en Vigo y su área",
+      "source": "Metropolitano (Qué Hacer)",
+      "event_date": "Sábado 21 de noviembre",
+      "event_date_key": "2026-11-21",
+      "first_seen": "2026-11-20T19:45:43.145244",
+      "notified_at": "2026-11-20T19:45:43.145244"
     }
   }
 }
