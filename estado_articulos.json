@@ -1,7 +1,7 @@
 {
   "created_at": "2026-10-24T22:20:19.323545",
-  "last_check": "2026-11-19T14:01:13.201783",
-  "total_registrados": 56,
+  "last_check": "2026-11-20T13:30:58.943579",
+  "total_registrados": 57,
   "articulos": {
     "https://metropolitano.gal/agenda/magosto-y-tunel-del-terror-en-chapela/": {
       "title": "Magosto y Túnel del terror en Chapela",
@@ -539,6 +539,14 @@
       "event_date_key": "2026-11-21",
       "first_seen": "2026-11-19T14:01:13.201783",
       "notified_at": "2026-11-19T14:01:13.201783"
+    },
+    "https://metropolitano.gal/que-hacer/nieve-desfile-de-fantasia-y-circo-magico-para-los-dos-espectaculares-encendidos-de-navidad-de-redondela/": {
+      "title": "Nieve, desfile de fantasía y circo mágico para los dos espectaculares encendidos de Navidad de Redondela",
+      "source": "Metropolitano (Qué Hacer)",
+      "event_date": "Viernes 27 de noviembre",
+      "event_date_key": "2026-11-27",
+      "first_seen": "2026-11-20T13:30:58.943579",
+      "notified_at": "2026-11-20T13:30:58.943579"
     }
   }
 }
