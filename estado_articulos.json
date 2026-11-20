@@ -1,7 +1,7 @@
 {
   "created_at": "2026-10-24T22:20:19.323545",
-  "last_check": "2026-11-20T13:30:58.943579",
-  "total_registrados": 57,
+  "last_check": "2026-11-20T18:45:41.713883",
+  "total_registrados": 58,
   "articulos": {
     "https://metropolitano.gal/agenda/magosto-y-tunel-del-terror-en-chapela/": {
       "title": "Magosto y Túnel del terror en Chapela",
@@ -547,6 +547,14 @@
       "event_date_key": "2026-11-27",
       "first_seen": "2026-11-20T13:30:58.943579",
       "notified_at": "2026-11-20T13:30:58.943579"
+    },
+    "https://metropolitano.gal/agenda/encendido-navidad-de-redondela/": {
+      "title": "Encendido Navidad de Redondela",
+      "source": "Metropolitano (Agenda)",
+      "event_date": "Viernes, 27 de noviembre 7:00pm",
+      "event_date_key": "2026-11-27",
+      "first_seen": "2026-11-20T18:45:41.713883",
+      "notified_at": "2026-11-20T18:45:41.713883"
     }
   }
 }
