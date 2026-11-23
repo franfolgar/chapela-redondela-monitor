@@ -1,7 +1,7 @@
 {
   "created_at": "2026-10-24T22:20:19.323545",
-  "last_check": "2026-11-20T19:45:43.145244",
-  "total_registrados": 59,
+  "last_check": "2026-11-23T09:15:36.851403",
+  "total_registrados": 60,
   "articulos": {
     "https://metropolitano.gal/agenda/magosto-y-tunel-del-terror-en-chapela/": {
       "title": "Magosto y Túnel del terror en Chapela",
@@ -563,6 +563,15 @@
       "event_date_key": "2026-11-21",
       "first_seen": "2026-11-20T19:45:43.145244",
       "notified_at": "2026-11-20T19:45:43.145244"
+    },
+    "https://www.vigopeques.com/redondela-y-chapela-encienden-la-navidad-con-desfiles-y-un-nuevo-circo/": {
+      "title": "Redondela y Chapela encienden la Navidad con desfiles y un nuevo circo",
+      "source": "VigoPeques",
+      "event_date": "Viernes 27 de noviembre",
+      "event_date_key": "2026-11-27",
+      "first_seen": "2026-11-23T09:15:36.851403",
+      "notified_at": null,
+      "duplicado_de": "https://metropolitano.gal/que-hacer/nieve-desfile-de-fantasia-y-circo-magico-para-los-dos-espectaculares-encendidos-de-navidad-de-redondela/"
     }
   }
 }
