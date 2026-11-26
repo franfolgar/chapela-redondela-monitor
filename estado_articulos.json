@@ -1,7 +1,7 @@
 {
   "created_at": "2026-10-24T22:20:19.323545",
-  "last_check": "2026-11-23T09:15:36.851403",
-  "total_registrados": 60,
+  "last_check": "2026-11-26T19:15:40.356037",
+  "total_registrados": 61,
   "articulos": {
     "https://metropolitano.gal/agenda/magosto-y-tunel-del-terror-en-chapela/": {
       "title": "Magosto y Túnel del terror en Chapela",
@@ -572,6 +572,15 @@
       "first_seen": "2026-11-23T09:15:36.851403",
       "notified_at": null,
       "duplicado_de": "https://metropolitano.gal/que-hacer/nieve-desfile-de-fantasia-y-circo-magico-para-los-dos-espectaculares-encendidos-de-navidad-de-redondela/"
+    },
+    "https://metropolitano.gal/que-hacer/redondela-aplaza-la-gran-fiesta-del-encendido-de-navidad-en-chapela/": {
+      "title": "Redondela aplaza la gran fiesta del encendido de Navidad en Chapela",
+      "source": "Metropolitano (Qué Hacer)",
+      "event_date": "Viernes 27 de noviembre",
+      "event_date_key": "2026-11-27",
+      "first_seen": "2026-11-26T19:15:40.356037",
+      "notified_at": null,
+      "duplicado_de": "https://metropolitano.gal/agenda/encendido-navidad-de-redondela/"
     }
   }
 }
