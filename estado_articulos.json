@@ -1,7 +1,7 @@
 {
   "created_at": "2026-10-24T22:20:19.323545",
-  "last_check": "2026-11-27T20:01:10.995107",
-  "total_registrados": 63,
+  "last_check": "2026-11-27T20:15:50.162597",
+  "total_registrados": 64,
   "articulos": {
     "https://metropolitano.gal/agenda/magosto-y-tunel-del-terror-en-chapela/": {
       "title": "Magosto y Túnel del terror en Chapela",
@@ -597,6 +597,14 @@
       "event_date_key": "2026-12-05",
       "first_seen": "2026-11-27T20:01:10.995107",
       "notified_at": "2026-11-27T20:01:10.995107"
+    },
+    "https://metropolitano.gal/que-hacer/rondallas-navidad-verbena-y-mercado-en-el-ultimo-fin-de-semana-de-noviembre-en-vigo-y-su-area/": {
+      "title": "Rondallas, Navidad, verbena y mercado en el último fin de semana de noviembre en Vigo y su área",
+      "source": "Metropolitano (Qué Hacer)",
+      "event_date": "10 de enero",
+      "event_date_key": "2027-01-10",
+      "first_seen": "2026-11-27T20:15:50.162597",
+      "notified_at": "2026-11-27T20:15:50.162597"
     }
   }
 }
